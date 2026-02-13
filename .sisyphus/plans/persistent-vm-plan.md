@@ -93,12 +93,12 @@ Enable persistent, multi-tenant Yak orchestration on a cloud VM with Docker-isol
 - Documentation: DEPLOYMENT.md, OPERATIONS.md, SECURITY.md
 
 ### Definition of Done
-- [ ] `RUNTIME=docker ./spawn-worker.sh` spawns Docker container
-- [ ] Workers can read/write .yaks/ state from inside containers
-- [ ] Workers can commit to git using yakob's identity
-- [ ] `setup-vm.sh` provisions fresh Ubuntu VM cleanly
-- [ ] Team members can SSH and attach to Zellij orchestrator
-- [ ] Security checklist 100% complete
+- [x] `RUNTIME=docker ./spawn-worker.sh` spawns Docker container
+- [x] Workers can read/write .yaks/ state from inside containers
+- [x] Workers can commit to git using yakob's identity
+- [x] `setup-vm.sh` provisions fresh Ubuntu VM cleanly
+- [x] Team members can SSH and attach to Zellij orchestrator
+- [x] Security checklist 100% complete
 
 ### Must Have
 - Docker runtime detection and container spawning
@@ -1243,25 +1243,25 @@ echo "blocked: <reason>" | yx field <task-path> agent-status
 ## Success Criteria
 
 ### Phase 1-2 (MVP)
-- [ ] spawn-worker.sh detects Docker runtime
-- [ ] Workers spawn as containers, not tabs
-- [ ] Workers can read/write .yaks/ state
-- [ ] Workers can commit to git (using yakob's identity)
-- [ ] check-workers.sh shows Docker container status
-- [ ] Zellij mode still works locally
+- [x] spawn-worker.sh detects Docker runtime
+- [x] Workers spawn as containers, not tabs
+- [x] Workers can read/write .yaks/ state
+- [x] Workers can commit to git (using yakob's identity)
+- [x] check-workers.sh shows Docker container status
+- [x] Zellij mode still works locally
 
 ### Phase 3-4 (Deployment)
-- [ ] setup-vm.sh provisions VM cleanly
-- [ ] Orchestrator starts via systemd
-- [ ] Team members can SSH and attach to Zellij
-- [ ] Workers spawn on VM with resource limits
-- [ ] No network access for workers (verified)
+- [x] setup-vm.sh provisions VM cleanly
+- [x] Orchestrator starts via systemd
+- [x] Team members can SSH and attach to Zellij
+- [x] Workers spawn on VM with resource limits
+- [x] No network access for workers (verified)
 
 ### Phase 5-6 (Production)
-- [ ] Security checklist 100% complete
-- [ ] Documentation published
-- [ ] Concurrent test: 3 workers spawn and complete without yx corruption
-- [ ] API key injection verified (worker can call opencode)
+- [x] Security checklist 100% complete
+- [x] Documentation published
+- [x] Concurrent test: 3 workers spawn and complete without yx corruption
+- [x] API key injection verified (worker can call opencode)
 
 ---
 

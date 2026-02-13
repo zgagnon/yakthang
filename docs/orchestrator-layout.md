@@ -1,0 +1,89 @@
+# Orchestrator Layout
+
+## Overview
+
+Yakthang uses Zellij as its terminal multiplexer. A single KDL layout file
+(`orchestrator.kdl`) defines the orchestrator tab, and workers are spawned
+dynamically as additional tabs.
+
+## Orchestrator Tab
+
+The orchestrator tab ("Yakob's 🛖") is a vertical split with three panes:
+
+```
+┌──────────────┬──────────────────────────────┐
+│              │                              │
+│   yak-map    │     orchestrator (opencode)  │
+│   (33%)      │          (80% of 67%)        │
+│              │                              │
+│  live task   │  Yakob plans, spawns, and    │
+│  tree via    │  monitors from here          │
+│  `yx ls`     │                              │
+│              ├──────────────────────────────┤
+│              │  shell (orchestrator) (20%)  │
+│              │  manual commands             │
+└──────────────┴──────────────────────────────┘
+```
+
+### Yak-map pane (left, 33%)
+
+Runs `watch --color --no-title --no-wrap --interval 2 "yx ls"`, providing a
+live view of all tasks and their states. Refreshes every 2 seconds. This is
+the orchestrator's primary situational awareness tool.
+
+### Orchestrator pane (right top, ~80% of 67%)
+
+Runs an interactive `opencode` instance. This is where Yakob (the orchestrator
+persona) operates. The orchestrator reads task state, writes task context,
+and spawns workers — but never edits application code directly.
+
+### Shell pane (right bottom, ~20% of 67%)
+
+A plain shell for manual commands: running `check-workers.sh`, reading fields,
+git operations, or anything the orchestrator needs outside of opencode.
+
+## Worker Tabs
+
+Worker tabs are created dynamically by `spawn-worker.sh` (see
+[worker-spawning.md](worker-spawning.md)). Each worker tab has:
+
+```
+┌──────────────────────────────────────────────┐
+│  compact-bar                                 │
+├──────────────────────────────────────────────┤
+│                                              │
+│  opencode (plan|build)  (67%)                │
+│  worker agent instance                       │
+│                                              │
+├──────────────────────────────────────────────┤
+│  shell: /path/to/cwd    (33%)                │
+│  worker's local shell                        │
+├──────────────────────────────────────────────┤
+│  status-bar                                  │
+└──────────────────────────────────────────────┘
+```
+
+The tab name shows the worker's randomly assigned identity (e.g.
+"Yakueline 🦬💈").
+
+## Launching
+
+```bash
+./launch.sh
+```
+
+This runs `zellij --layout orchestrator.kdl`, which creates the orchestrator
+tab. Everything else is spawned from there.
+
+## Key Design Decisions
+
+- **Zellij over tmux**: Zellij's KDL layouts and `new-tab --layout` command
+  make it possible to define worker tab structure declaratively.
+- **Watch for the yak-map**: A simple `watch` loop over `yx ls` is sufficient
+  for live task state. No custom daemon needed.
+- **Opencode for both orchestrator and workers**: The orchestrator runs
+  interactive opencode; workers run `opencode run` in headless mode (via
+  `spawn-worker.sh`).
+- **Focus returns to orchestrator**: After spawning a worker tab,
+  `spawn-worker.sh` calls `zellij action go-to-previous-tab` so the
+  orchestrator doesn't lose its place.

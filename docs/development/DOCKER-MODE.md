@@ -200,16 +200,6 @@ sleep 2
 
 ## Known Limitations
 
-### Mock OpenCode/yx
-
-The worker image currently uses mock opencode/yx installations (echo version only).
-
-**Impact**: Workers spawn correctly but don't execute actual opencode tasks.
-
-**Workaround**: For full testing, replace mock installations with real binaries in worker.Dockerfile.
-
-**Tracking**: See `.sisyphus/notepads/persistent-vm-plan/issues.md`
-
 ### macOS File Permissions
 
 Docker Desktop on macOS may have permission issues with bind mounts.

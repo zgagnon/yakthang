@@ -101,9 +101,9 @@ chmod +x spawn-worker.sh
 
 **Symptom**: Containers appear in `docker ps -a` with Exited status.
 
-**Cause**: Mock opencode exits immediately (known issue).
+**Cause**: Worker command failed or completed.
 
-**Solution**: This is expected with mock installations. Check logs:
+**Solution**: Check worker logs for errors:
 ```bash
 docker logs yak-worker-<name>
 ```

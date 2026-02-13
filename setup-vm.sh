@@ -121,73 +121,86 @@ install_system_packages() {
 }
 
 #------------------------------------------------------------------------------
-# 3. Install OpenCode CLI
-# TODO: Replace with real installation when available
-# See: .sisyphus/notepads/persistent-vm-plan/issues.md
+# 3. Install GitHub CLI
+#------------------------------------------------------------------------------
+
+install_gh_cli() {
+	log "Installing GitHub CLI..."
+
+	if command -v gh &>/dev/null; then
+		log "GitHub CLI already installed: $(gh --version)"
+		return 0
+	fi
+
+	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+		gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
+
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
+		tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+
+	apt-get update
+	apt-get install -y gh
+
+	log "GitHub CLI installed: $(gh --version)"
+}
+
+#------------------------------------------------------------------------------
+# 4. Install OpenCode CLI
 #------------------------------------------------------------------------------
 
 install_opencode() {
 	log "Installing OpenCode CLI..."
 
-	if [[ -x /usr/local/bin/opencode ]]; then
-		log "OpenCode already installed: $(/usr/local/bin/opencode --version 2>&1 || echo 'mock')"
+	if command -v opencode &>/dev/null; then
+		log "OpenCode already installed: $(opencode --version)"
 		return 0
 	fi
 
-	# TODO: Replace this mock with real installation
-	# The official install script (https://opencode.ai/install.sh) returns 404
-	# Options when available:
-	#   1. curl -fsSL https://opencode.ai/install.sh | bash
-	#   2. Download pre-built Linux binary
-	#   3. Install from package manager
+	# Install using official install script
+	log "Downloading and running official OpenCode installer..."
+	curl -fsSL https://opencode.ai/install | bash
 
-	log "WARNING: Installing mock OpenCode (real install script not available)"
-	cat >/usr/local/bin/opencode <<'EOF'
-#!/bin/bash
-# Mock OpenCode CLI - replace with real installation
-# See: .sisyphus/notepads/persistent-vm-plan/issues.md
-echo "OpenCode CLI v1.1.60 (mock)"
-EOF
-	chmod +x /usr/local/bin/opencode
-
-	log "OpenCode CLI installed (mock): $(/usr/local/bin/opencode)"
+	log "OpenCode CLI installed: $(opencode --version)"
 }
 
 #------------------------------------------------------------------------------
-# 4. Install yx (Yak task manager)
-# TODO: Replace with real installation when available
-# See: .sisyphus/notepads/persistent-vm-plan/issues.md
+# 5. Install yx (Yak task manager) from source
 #------------------------------------------------------------------------------
 
 install_yx() {
 	log "Installing yx..."
 
 	if [[ -x /usr/local/bin/yx ]]; then
-		log "yx already installed: $(/usr/local/bin/yx --version 2>&1 || echo 'mock')"
+		log "yx already installed: $(/usr/local/bin/yx --version 2>&1)"
 		return 0
 	fi
 
-	# TODO: Replace this mock with real installation
-	# The install script (https://raw.githubusercontent.com/yakthang/yx/main/install.sh) returns 404
-	# Options when available:
-	#   1. curl -fsSL https://raw.githubusercontent.com/yakthang/yx/main/install.sh | bash
-	#   2. Download pre-built Linux binary
-	#   3. Install from cargo (if Rust-based)
+	log "Installing Rust toolchain via rustup..."
+	if ! command -v rustup &>/dev/null; then
+		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+		source "$HOME/.cargo/env"
+	else
+		log "rustup already installed"
+	fi
 
-	log "WARNING: Installing mock yx (real install script not available)"
-	cat >/usr/local/bin/yx <<'EOF'
-#!/bin/bash
-# Mock yx CLI - replace with real installation
-# See: .sisyphus/notepads/persistent-vm-plan/issues.md
-echo "yx v0.1.0 (mock)"
-EOF
-	chmod +x /usr/local/bin/yx
+	local CLONE_DIR="/home/yakob/yakthang/tmp/mrdavidlaing-yaks"
 
-	log "yx installed (mock): $(/usr/local/bin/yx)"
+	log "Cloning mrdavidlaing/yaks repository (ls-format-flag branch)..."
+	mkdir -p "$(dirname "$CLONE_DIR")"
+	gh repo clone mrdavidlaing/yaks "$CLONE_DIR" -- --branch ls-format-flag
+
+	log "Building yx from source..."
+	cd "$CLONE_DIR"
+	cargo build --release
+
+	log "Installing yx binary to /usr/local/bin..."
+	install -m 0755 target/release/yx /usr/local/bin/yx
+
+	log "yx installed: $(yx --version)"
 }
 
 #------------------------------------------------------------------------------
-# 5. Security Hardening
+# 6. Security Hardening
 #------------------------------------------------------------------------------
 
 configure_security() {
@@ -237,7 +250,7 @@ DOCKER_EOF
 }
 
 #------------------------------------------------------------------------------
-# 6. Create yakob user (if not exists)
+# 7. Create yakob user (if not exists)
 #------------------------------------------------------------------------------
 
 create_yakob_user() {
@@ -267,7 +280,7 @@ create_yakob_user() {
 }
 
 #------------------------------------------------------------------------------
-# 6. Configure yakob's git identity
+# 8. Configure yakob's git identity
 #------------------------------------------------------------------------------
 
 configure_yakob_git() {
@@ -303,7 +316,7 @@ configure_yakob_git() {
 }
 
 #------------------------------------------------------------------------------
-# 7. Create workspace directory
+# 9. Create workspace directory
 #------------------------------------------------------------------------------
 
 setup_workspace() {
@@ -323,7 +336,7 @@ setup_workspace() {
 }
 
 #------------------------------------------------------------------------------
-# 8. Copy worker.Dockerfile and build image
+# 10. Copy worker.Dockerfile and build image
 #------------------------------------------------------------------------------
 
 build_worker_image() {
@@ -360,7 +373,7 @@ build_worker_image() {
 }
 
 #------------------------------------------------------------------------------
-# 9. Create systemd service file (but don't enable/start)
+# 11. Create systemd service file (but don't enable/start)
 #------------------------------------------------------------------------------
 
 create_systemd_service() {
@@ -425,6 +438,7 @@ main() {
 
 	install_docker
 	install_system_packages
+	install_gh_cli
 	install_opencode
 	install_yx
 	configure_security
@@ -444,10 +458,6 @@ main() {
 	log "  4. Enable and start the service"
 	log ""
 	log "NOTE: yakob must log out and back in for docker group to take effect"
-	log ""
-	log "WARNING: OpenCode and yx are currently mock installations."
-	log "         Replace with real binaries before production use."
-	log "         See: .sisyphus/notepads/persistent-vm-plan/issues.md"
 }
 
 main "$@"

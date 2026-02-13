@@ -54,7 +54,7 @@ gcloud compute ssh yak-orchestrator --zone=us-central1-a -- \
 
 The script will:
 - Install Docker Engine, git, zellij, watch, jq
-- Install OpenCode CLI and yx (currently mock - see Known Issues)
+- Install OpenCode CLI and yx
 - Create yakob user with docker group
 - Configure git identity
 - Build yak-worker:latest container image
@@ -113,18 +113,6 @@ zellij attach yak-orchestrator
 - [ ] Orchestrator running: `sudo systemctl status yak-orchestrator`
 - [ ] Zellij session active: `zellij list-sessions`
 - [ ] Can attach: `zellij attach yak-orchestrator`
-
-## Known Issues
-
-### Mock OpenCode/yx Installations
-
-**Issue**: setup-vm.sh uses mock scripts for opencode and yx (echo version numbers only).
-
-**Impact**: Workers will spawn but opencode won't actually execute tasks.
-
-**Workaround**: Replace mock installations with real binaries before production use.
-
-**Tracking**: See `.sisyphus/notepads/persistent-vm-plan/issues.md`
 
 ## Next Steps
 

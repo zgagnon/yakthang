@@ -44,6 +44,21 @@ SHAVER_NAME="${SHAVER_NAMES[$SHAVER_INDEX]}"
 SHAVER_EMOJI="${SHAVER_EMOJIS[$SHAVER_INDEX]}"
 SHAVER_PERSONALITY="${SHAVER_PERSONALITIES[$SHAVER_INDEX]}"
 
+# --- Runtime Detection --------------------------------------------------------
+# Detect runtime: Docker if available, else Zellij
+# Can be overridden with RUNTIME environment variable (docker|zellij)
+RUNTIME="${RUNTIME:-}"
+if [[ -z "$RUNTIME" ]]; then
+	if docker ps >/dev/null 2>&1; then
+		RUNTIME="docker"
+	elif command -v zellij >/dev/null 2>&1; then
+		RUNTIME="zellij"
+	else
+		echo "Error: Neither Docker nor Zellij available" >&2
+		exit 1
+	fi
+fi
+
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--cwd)
@@ -162,29 +177,55 @@ Workflow:
 Focus on the tasks assigned to you. Do not modify tasks outside your scope."
 fi
 
-# Write the prompt to a file and create a wrapper script that calls opencode with it.
-# This avoids multiline string issues in the KDL layout.
-WORKER_DIR="$(mktemp -d "${TMPDIR:-/tmp}/worker-XXXXXX")"
+if [[ "$RUNTIME" == "docker" ]]; then
+	WORKSPACE_ROOT="$(git rev-parse --show-toplevel)"
+	CONTAINER_NAME="yak-worker-${TAB_NAME//[^a-zA-Z0-9_-]/}"
 
-PROMPT_FILE="${WORKER_DIR}/prompt.txt"
-WRAPPER="${WORKER_DIR}/run.sh"
+	echo "$WORKER_PROMPT" | docker run \
+		--detach \
+		--name "$CONTAINER_NAME" \
+		--user "$(id -u):$(id -g)" \
+		--network none \
+		--security-opt no-new-privileges \
+		--tmpfs /home/worker/.cache \
+		--cpus 2 \
+		--memory 4g \
+		--pids-limit 512 \
+		-v "${WORKSPACE_ROOT}:${WORKSPACE_ROOT}:rw" \
+		-v "${YAK_PATH}:${YAK_PATH}:rw" \
+		-w "$CWD" \
+		-e WORKER_NAME="$SHAVER_NAME" \
+		-e WORKER_EMOJI="$SHAVER_EMOJI" \
+		-e YAK_PATH="$YAK_PATH" \
+		-e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+		-i \
+		yak-worker:latest \
+		opencode --prompt - --agent "$MODE"
 
-printf '%s' "$WORKER_PROMPT" >"$PROMPT_FILE"
+	for task in "${TASKS[@]}"; do
+		echo "${SHAVER_NAME} ${SHAVER_EMOJI}" | yx field "$task" assigned-to
+	done
 
-# The wrapper reads the prompt, runs opencode, then cleans up the temp dir.
-cat >"$WRAPPER" <<WRAPPER_EOF
+	echo "Spawned ${SHAVER_NAME} (${TAB_NAME}) in Docker container ${CONTAINER_NAME}"
+
+elif [[ "$RUNTIME" == "zellij" ]]; then
+	WORKER_DIR="$(mktemp -d "${TMPDIR:-/tmp}/worker-XXXXXX")"
+	PROMPT_FILE="${WORKER_DIR}/prompt.txt"
+	WRAPPER="${WORKER_DIR}/run.sh"
+
+	printf '%s' "$WORKER_PROMPT" >"$PROMPT_FILE"
+
+	cat >"$WRAPPER" <<WRAPPER_EOF
 #!/usr/bin/env bash
 PROMPT="\$(cat "${PROMPT_FILE}")"
 rm -rf "${WORKER_DIR}"
 exec opencode --prompt "\$PROMPT" --agent ${MODE}
 WRAPPER_EOF
-chmod +x "$WRAPPER"
+	chmod +x "$WRAPPER"
 
-# Create a temporary layout file for the worker tab.
-# Zellij 0.43+ requires a layout to run a command in a new tab.
-WORKER_LAYOUT="${WORKER_DIR}/layout.kdl"
+	WORKER_LAYOUT="${WORKER_DIR}/layout.kdl"
 
-cat >"$WORKER_LAYOUT" <<LAYOUT_EOF
+	cat >"$WORKER_LAYOUT" <<LAYOUT_EOF
 layout {
     tab name="${DISPLAY_NAME}" cwd="${CWD}" {
         pane size=1 borderless=true {
@@ -202,16 +243,18 @@ layout {
 }
 LAYOUT_EOF
 
-# Spawn the worker in a new Zellij tab
-zellij action new-tab --layout "$WORKER_LAYOUT" --name "$DISPLAY_NAME" --cwd "$CWD"
+	zellij action new-tab --layout "$WORKER_LAYOUT" --name "$DISPLAY_NAME" --cwd "$CWD"
 
-# Write assigned-to field for each task
-for task in "${TASKS[@]}"; do
-	echo "${SHAVER_NAME} ${SHAVER_EMOJI}" | yx field "$task" assigned-to
-done
+	for task in "${TASKS[@]}"; do
+		echo "${SHAVER_NAME} ${SHAVER_EMOJI}" | yx field "$task" assigned-to
+	done
 
-# Return focus to the previous tab (the orchestrator that called this script)
-sleep 0.3
-zellij action go-to-previous-tab
+	sleep 0.3
+	zellij action go-to-previous-tab
 
-echo "Spawned ${SHAVER_NAME} (${TAB_NAME}) in ${CWD}"
+	echo "Spawned ${SHAVER_NAME} (${TAB_NAME}) in ${CWD}"
+
+else
+	echo "Error: Unknown RUNTIME value: $RUNTIME" >&2
+	exit 1
+fi

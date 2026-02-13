@@ -33,20 +33,26 @@ RESOURCES="default"
 # --- Yak-shaver personalities ------------------------------------------------
 # Each worker gets a random identity. Yakob (the orchestrator) is the supervisor;
 # these are the yak shavers. The yaks (tasks) are what get shaved.
-SHAVER_NAMES=(Yakriel Yakueline Yakov Yakira)
-SHAVER_EMOJIS=("🦬🪒" "🦬💈" "🦬🔔" "🦬🧶")
-SHAVER_PERSONALITIES=(
-	"You are Yakriel — precise and methodical. You measure twice, shave once. You leave clean commits and tidy code behind you."
-	"You are Yakueline — fast and fearless. You tackle tasks head-on and ask forgiveness, not permission. Ship it."
-	"You are Yakov — cautious and thorough. You double-check everything before marking done. Better safe than shorn."
-	"You are Yakira — cheerful and communicative. You leave detailed status updates so Yakob always knows where things stand."
-)
+# Personalities are now read from .opencode/personalities/ files.
+WORKSPACE_ROOT="$(git rev-parse --show-toplevel)"
+PERSONALITY_DIR="${WORKSPACE_ROOT}/.opencode/personalities"
 
-# Pick a random shaver
-SHAVER_INDEX=$((RANDOM % ${#SHAVER_NAMES[@]}))
-SHAVER_NAME="${SHAVER_NAMES[$SHAVER_INDEX]}"
-SHAVER_EMOJI="${SHAVER_EMOJIS[$SHAVER_INDEX]}"
-SHAVER_PERSONALITY="${SHAVER_PERSONALITIES[$SHAVER_INDEX]}"
+WORKER_NAMES=(yakriel yakueline yakov yakira)
+WORKER_DISPLAY_NAMES=(Yakriel Yakueline Yakov Yakira)
+WORKER_EMOJIS=("🦬🪒" "🦬💈" "🦬🔔" "🦬🧶")
+
+# Pick a random worker
+SHAVER_INDEX=$((RANDOM % ${#WORKER_NAMES[@]}))
+SHAVER_NAME="${WORKER_DISPLAY_NAMES[$SHAVER_INDEX]}"
+SHAVER_EMOJI="${WORKER_EMOJIS[$SHAVER_INDEX]}"
+
+# Read personality from file
+PERSONALITY_FILE="${PERSONALITY_DIR}/${WORKER_NAMES[$SHAVER_INDEX]}-worker.md"
+if [[ ! -f "$PERSONALITY_FILE" ]]; then
+	echo "Error: Personality file not found: $PERSONALITY_FILE" >&2
+	exit 1
+fi
+SHAVER_PERSONALITY="$(cat "$PERSONALITY_FILE")"
 
 # --- Runtime Detection --------------------------------------------------------
 # Detect runtime: Docker if available, else Zellij
@@ -249,7 +255,10 @@ if [[ "$RUNTIME" == "docker" ]]; then
 		--user "$(id -u):$(id -g)" \
 		--network "$NETWORK_MODE" \
 		--security-opt no-new-privileges \
-		--tmpfs /home/worker/.cache \
+		--cap-drop ALL \
+		--read-only \
+		--tmpfs /tmp:rw,noexec,nosuid,size=100m \
+		--tmpfs /home/worker/.cache:rw,noexec,nosuid,size=500m \
 		--cpus "$CPUS" \
 		--memory "$MEMORY" \
 		--pids-limit "$PIDS_LIMIT" \

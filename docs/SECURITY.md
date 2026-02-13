@@ -544,3 +544,74 @@ sudo systemctl status yak-orchestrator
 2. Restart orchestrator: `sudo systemctl restart yak-orchestrator`
 3. Verify new key in service: `sudo systemctl show yak-orchestrator | grep ANTHROPIC`
 4. Spawn test worker to confirm new key works
+
+---
+
+## Security Hardening Checklist
+
+### VM-Level Security
+
+- [ ] **Firewall (UFW)**: Configured to allow SSH only
+  - Verify: `sudo ufw status`
+  - Should show: Status: active, 22/tcp ALLOW
+  
+- [ ] **SSH Hardening**: Password authentication disabled, root login disabled
+  - Verify: `grep PasswordAuthentication /etc/ssh/sshd_config`
+  - Should show: PasswordAuthentication no
+  - Verify: `grep PermitRootLogin /etc/ssh/sshd_config`
+  - Should show: PermitRootLogin no
+
+- [ ] **Fail2ban**: Installed and running
+  - Verify: `sudo systemctl status fail2ban`
+  - Should show: active (running)
+
+- [ ] **Docker Daemon**: Security settings applied
+  - Verify: `cat /etc/docker/daemon.json`
+  - Should contain: no-new-privileges, icc: false, log limits
+
+### Container-Level Security
+
+- [ ] **Capabilities Dropped**: Containers run with --cap-drop ALL
+  - Verify: `docker inspect <container> --format '{{.HostConfig.CapDrop}}'`
+  - Should show: [ALL]
+
+- [ ] **Read-Only Root**: Containers have read-only rootfs
+  - Verify: `docker inspect <container> --format '{{.HostConfig.ReadonlyRootfs}}'`
+  - Should show: true
+
+- [ ] **Tmpfs Mounts**: Writable areas use tmpfs (ephemeral)
+  - Verify: `docker inspect <container> --format '{{.HostConfig.Tmpfs}}'`
+  - Should show: /tmp and /home/worker/.cache
+
+- [ ] **Network Isolation**: Default network mode is none
+  - Verify: `docker inspect <container> --format '{{.HostConfig.NetworkMode}}'`
+  - Should show: none (unless --setup-network used)
+
+- [ ] **No New Privileges**: Containers cannot gain privileges
+  - Verify: `docker inspect <container> --format '{{.HostConfig.SecurityOpt}}'`
+  - Should show: [no-new-privileges]
+
+- [ ] **Resource Limits**: CPU, memory, pids limits applied
+  - Verify: `docker inspect <container> --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}} {{.HostConfig.PidsLimit}}'`
+  - Should show: non-zero values
+
+### Credential Security
+
+- [ ] **API Key**: Stored in systemd service environment only
+  - Verify: `sudo systemctl cat yak-orchestrator | grep ANTHROPIC_API_KEY`
+  - Should NOT show actual key value in git
+
+- [ ] **Service File Permissions**: Restricted to root
+  - Verify: `ls -l /etc/systemd/system/yak-orchestrator.service`
+  - Should show: -rw------- root root
+
+### Monitoring
+
+- [ ] **Failed SSH Attempts**: Monitor fail2ban logs
+  - Command: `sudo fail2ban-client status sshd`
+
+- [ ] **Container Escapes**: Monitor for privilege escalation attempts
+  - Command: `sudo journalctl -u docker -f | grep -i "privilege\|escape"`
+
+- [ ] **Resource Usage**: Monitor container resource consumption
+  - Command: `docker stats --no-stream`

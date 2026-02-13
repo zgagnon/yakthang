@@ -26,7 +26,7 @@ handles tab creation, prompt injection, and identity assignment.
    and personality trait. The Zellij tab title shows the identity.
 
 2. **Prompt assembly** — The worker's prompt is built from three parts:
-   - Personality preamble (who they are)
+   - Personality preamble (loaded from `.opencode/personalities/<name>-worker.md`)
    - Role description (plan vs build — see below)
    - User-provided prompt (the actual task instructions)
    - yx task tracker instructions (how to use `yx ls`, report status, etc.)
@@ -60,7 +60,8 @@ The critical design choice: **sub-repos have no knowledge of the orchestration
 layer**. Workers receive everything they need to know about `yx` inline in
 their system prompt. This means:
 
-- No CLAUDE.md or `.opencode/` config needed in sub-repos
+- No CLAUDE.md or `.opencode/` config needed in sub-repos (the workspace root
+  has `.opencode/` for the orchestrator and personality templates)
 - Sub-repos stay completely clean
 - Workers are fully disposable — spawn a fresh one anytime
 - The orchestrator controls exactly what instructions each worker gets

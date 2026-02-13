@@ -16,7 +16,7 @@ Zellij tab bar and in conversation.
 > like a good shepherd rations salt licks.
 
 Yakob is not a spawned worker — he is the orchestrator persona defined in
-`CLAUDE.md`. He plans, coordinates, and monitors. He never picks up the
+`.opencode/agents/yakob-orchestrator.md`. He plans, coordinates, and monitors. He never picks up the
 clippers himself.
 
 ### Yakriel 🦬🪒
@@ -56,12 +56,13 @@ where the orchestrator needs frequent progress updates.
 Personalities are assigned randomly at spawn time in `spawn-worker.sh`:
 
 ```bash
-SHAVER_INDEX=$((RANDOM % ${#SHAVER_NAMES[@]}))
+SHAVER_INDEX=$((RANDOM % ${#WORKER_NAMES[@]}))
 ```
 
-The personality text is injected as the first line of the worker's system
-prompt, before the role description and task instructions. This means the
-personality influences the agent's behavior throughout the session.
+The personality is loaded from `.opencode/personalities/<name>-worker.md` and
+injected as the first line of the worker's system prompt, before the role
+description and task instructions. This means the personality influences the
+agent's behavior throughout the session.
 
 ## Tab Display
 

@@ -467,18 +467,17 @@ build_worker_image() {
 }
 
 #------------------------------------------------------------------------------
-# 14. Create systemd service file (but don't enable/start)
+# 14. Create OpenClaw Gateway systemd service
 #------------------------------------------------------------------------------
 
 create_systemd_service() {
-	log "Creating systemd service file..."
+	log "Creating OpenClaw Gateway systemd service..."
 
-	local service_file="/etc/systemd/system/yak-orchestrator.service"
+	local service_file="/etc/systemd/system/openclaw-gateway.service"
 
 	cat >"$service_file" <<'EOF'
 [Unit]
-Description=Yak Orchestrator
-Documentation=https://github.com/yakthang/yak-orchestrator
+Description=OpenClaw Gateway (Yakob Orchestrator)
 After=network.target docker.service
 Requires=docker.service
 
@@ -486,24 +485,26 @@ Requires=docker.service
 Type=simple
 User=yakob
 Group=yakob
-WorkingDirectory=/home/yakob/workspace
+WorkingDirectory=/home/yakob/yakthang
 
-# API key must be set before starting
-# Edit this file or create override: systemctl edit yak-orchestrator
+# Environment variables for credentials (set via systemctl edit)
 Environment="ANTHROPIC_API_KEY="
+Environment="ZELLIJ_SESSION_NAME=yak-workers"
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 
-# Run orchestrator in zellij with the defined layout
-ExecStart=/usr/local/bin/zellij --session yak-orchestrator --layout /home/yakob/workspace/orchestrator.kdl
+# Optional: Uncomment when adding Slack integration
+# Environment="SLACK_APP_TOKEN="
+# Environment="SLACK_BOT_TOKEN="
 
-# Restart policy
+ExecStart=/usr/bin/openclaw gateway --port 18789
+
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=30
 
-# Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=yak-orchestrator
+SyslogIdentifier=openclaw-gateway
 
 [Install]
 WantedBy=multi-user.target
@@ -514,10 +515,14 @@ EOF
 
 	log "Created systemd service: $service_file"
 	log "NOTE: Service not enabled/started. To use:"
-	log "  1. Set ANTHROPIC_API_KEY: systemctl edit yak-orchestrator"
-	log "  2. Copy orchestrator.kdl to /home/yakob/workspace/"
-	log "  3. Enable: systemctl enable yak-orchestrator"
-	log "  4. Start:  systemctl start yak-orchestrator"
+	log "  1. Set ANTHROPIC_API_KEY in override file:"
+	log "     sudo mkdir -p /etc/systemd/system/openclaw-gateway.service.d"
+	log "     sudo tee /etc/systemd/system/openclaw-gateway.service.d/override.conf <<< '[Service]'"
+	log "     sudo tee -a /etc/systemd/system/openclaw-gateway.service.d/override.conf <<< 'Environment=\"ANTHROPIC_API_KEY=your-key-here\"'"
+	log "  2. Enable: systemctl enable openclaw-gateway"
+	log "  3. Start a Zellij session: zellij --session yak-workers"
+	log "  4. Start: systemctl start openclaw-gateway"
+	log "  5. Check status: systemctl status openclaw-gateway"
 }
 
 #------------------------------------------------------------------------------
@@ -549,14 +554,28 @@ main() {
 	log "VM provisioning complete!"
 	log ""
 	log "Next steps:"
-	log "  1. Log in as yakob: su - yakob"
-	log "  2. Run OpenClaw onboarding: openclaw onboard"
-	log "  3. Copy project files to /home/yakob/workspace/"
-	log "  4. Set ANTHROPIC_API_KEY in service config"
-	log "  5. Enable and start the service"
+	log "  1. Set ANTHROPIC_API_KEY:"
+	log "     sudo mkdir -p /etc/systemd/system/openclaw-gateway.service.d"
+	log "     echo '[Service]' | sudo tee /etc/systemd/system/openclaw-gateway.service.d/override.conf"
+	log "     echo 'Environment=\"ANTHROPIC_API_KEY=sk-ant-your-key\"' | sudo tee -a /etc/systemd/system/openclaw-gateway.service.d/override.conf"
+	log "     sudo systemctl daemon-reload"
+	log ""
+	log "  2. Run OpenClaw onboarding (as yakob):"
+	log "     su - yakob"
+	log "     cd /home/yakob/yakthang"
+	log "     openclaw onboard --workspace /home/yakob/yakthang/.openclaw/workspace"
+	log ""
+	log "  3. Customize identity files (SOUL.md, AGENTS.md, HEARTBEAT.md)"
+	log "     in /home/yakob/yakthang/.openclaw/workspace/"
+	log ""
+	log "  4. Enable and start OpenClaw Gateway:"
+	log "     sudo systemctl enable openclaw-gateway"
+	log "     sudo systemctl start openclaw-gateway"
+	log "     sudo systemctl status openclaw-gateway"
 	log ""
 	log "OpenClaw workspace: /home/yakob/yakthang/.openclaw/workspace"
 	log "Task state symlink: /home/yakob/yakthang/.openclaw/workspace/.yaks -> /home/yakob/yakthang/.yaks"
+	log "Gateway port: 18789 (http://localhost:18789/)"
 	log ""
 	log "NOTE: yakob must log out and back in for docker group to take effect"
 }

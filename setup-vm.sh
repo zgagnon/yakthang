@@ -187,7 +187,57 @@ EOF
 }
 
 #------------------------------------------------------------------------------
-# 5. Create yakob user (if not exists)
+# 5. Security Hardening
+#------------------------------------------------------------------------------
+
+configure_security() {
+	log "Configuring security hardening..."
+
+	# --- Configure UFW firewall ---
+	log "Configuring UFW firewall..."
+	apt-get install -y ufw
+	ufw default deny incoming
+	ufw default allow outgoing
+	ufw allow ssh
+	ufw --force enable
+
+	# --- Harden SSH configuration ---
+	log "Hardening SSH..."
+	sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+	sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+	sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+	sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+	systemctl reload sshd || systemctl reload ssh || true
+
+	# --- Install fail2ban ---
+	log "Installing fail2ban..."
+	apt-get install -y fail2ban
+	systemctl enable fail2ban
+	systemctl start fail2ban
+
+	# --- Configure Docker daemon security ---
+	log "Configuring Docker daemon..."
+	mkdir -p /etc/docker
+	cat >/etc/docker/daemon.json <<'DOCKER_EOF'
+{
+  "live-restore": true,
+  "userland-proxy": false,
+  "no-new-privileges": true,
+  "icc": false,
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+DOCKER_EOF
+	systemctl restart docker
+
+	log "Security hardening complete"
+}
+
+#------------------------------------------------------------------------------
+# 6. Create yakob user (if not exists)
 #------------------------------------------------------------------------------
 
 create_yakob_user() {
@@ -336,7 +386,7 @@ WorkingDirectory=/home/yakob/workspace
 Environment="ANTHROPIC_API_KEY="
 
 # Run orchestrator in zellij with the defined layout
-ExecStart=/usr/local/bin/zellij --layout /home/yakob/workspace/orchestrator.kdl
+ExecStart=/usr/local/bin/zellij --session yak-orchestrator --layout /home/yakob/workspace/orchestrator.kdl
 
 # Restart policy
 Restart=on-failure
@@ -377,6 +427,7 @@ main() {
 	install_system_packages
 	install_opencode
 	install_yx
+	configure_security
 	create_yakob_user
 	configure_yakob_git
 	setup_workspace

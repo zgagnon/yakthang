@@ -29,7 +29,7 @@ permission:
     "git diff *": "allow"
     "git push": "ask"
     "git push *": "ask"
-color: "#8B7355"
+color: "#d79921"
 ---
 
 # Orchestrator Claude

@@ -184,3 +184,363 @@ The worker container also applies:
 - [Docker Network Documentation](https://docs.docker.com/network/)
 - [Container Security Best Practices](https://docs.docker.com/engine/security/)
 - [NIST Container Security Guidelines](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-190.pdf)
+
+---
+
+# Credential Management
+
+## Three-Layer Security Model
+
+The Yak orchestration system uses a three-layer security model to manage credentials and access control:
+
+### Layer 1: VM Boundary (GCP)
+
+**Scope**: GCP Compute Engine VM access
+
+**Credentials**: SSH keys, GCP IAM permissions
+
+**Management**: GCP Console, gcloud CLI
+
+**Purpose**: Controls who can access the VM itself
+
+**Setup**:
+- Use GCP OS Login for SSH key management
+- Restrict firewall rules (no inbound except SSH)
+- Use service accounts with minimal permissions
+- Enable VPC Service Controls for additional isolation
+
+### Layer 2: yakob User (Host)
+
+**Scope**: yakob user on the VM
+
+**Credentials**: ANTHROPIC_API_KEY environment variable
+
+**Management**: Set in yakob's shell profile or systemd service
+
+**Purpose**: Orchestrator and workers inherit this key
+
+**Setup**:
+- Add to `/etc/systemd/system/yak-orchestrator.service`:
+  ```ini
+  [Service]
+  Environment="ANTHROPIC_API_KEY=sk-ant-..."
+  ```
+- Or add to yakob's `~/.bashrc`:
+  ```bash
+  export ANTHROPIC_API_KEY="sk-ant-..."
+  ```
+- Ensure file permissions: `chmod 600 ~/.bashrc`
+- Verify inheritance: `echo $ANTHROPIC_API_KEY` (should show key)
+
+### Layer 3: Ephemeral Workers (Containers)
+
+**Scope**: Individual Docker containers
+
+**Credentials**: Inherited from yakob via `-e` flag
+
+**Management**: Automatic via spawn-worker.sh
+
+**Purpose**: Workers use API key for OpenCode operations
+
+**Implementation**: spawn-worker.sh passes `-e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"` (line 265)
+
+**Security Properties**:
+- API key not baked into Docker image
+- Each container gets fresh environment
+- Containers destroyed after task completion
+- No credential persistence in container filesystem
+
+## API Key Handling
+
+### Storage
+
+**Primary Method**: ANTHROPIC_API_KEY stored in yakob user environment only
+
+**Options**:
+1. **Systemd service file** (recommended for production):
+   - Path: `/etc/systemd/system/yak-orchestrator.service`
+   - Permissions: `chmod 600` (root-owned)
+   - Survives reboots, managed by systemd
+
+2. **Shell profile** (development/testing):
+   - Path: `~/.bashrc` or `~/.profile`
+   - Permissions: `chmod 600` (yakob-owned)
+   - Loaded on interactive login
+
+### Transmission
+
+**Container Passthrough**: Docker `-e` flag passes environment variable to container
+
+**Implementation**:
+```bash
+docker run -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" ...
+```
+
+**Security Notes**:
+- `${ANTHROPIC_API_KEY:-}` syntax prevents errors if unset
+- Environment variables visible in `docker inspect` (restrict access)
+- Not logged by Docker daemon (unlike command arguments)
+
+### Rotation
+
+**Procedure**:
+1. Generate new API key in Anthropic dashboard
+2. Update yakob's environment:
+   ```bash
+   sudo systemctl edit yak-orchestrator
+   # Update Environment="ANTHROPIC_API_KEY=sk-ant-NEW..."
+   ```
+3. Restart orchestrator service:
+   ```bash
+   sudo systemctl restart yak-orchestrator
+   ```
+4. Kill existing workers (they have old key):
+   ```bash
+   docker ps -q --filter "ancestor=yak-worker:latest" | xargs docker kill
+   ```
+5. Revoke old key in Anthropic dashboard
+
+**Frequency**: Quarterly or after team changes
+
+### Revocation
+
+**Emergency Procedure**:
+1. Revoke key in Anthropic dashboard (immediate effect)
+2. Remove from yakob's environment:
+   ```bash
+   sudo systemctl edit yak-orchestrator
+   # Remove Environment="ANTHROPIC_API_KEY=..." line
+   ```
+3. Restart service and kill workers:
+   ```bash
+   sudo systemctl restart yak-orchestrator
+   docker ps -q --filter "ancestor=yak-worker:latest" | xargs docker kill
+   ```
+
+## Credential Directory Structure (Conceptual)
+
+If additional credentials are needed in the future, use this structure:
+
+```
+/etc/yak-creds/
+  anthropic-api-key    # Alternative to environment variable
+  github-token         # For private repo access (if needed)
+  docker-registry      # For private Docker registries
+  ...
+```
+
+**Permissions**:
+```bash
+sudo mkdir -p /etc/yak-creds
+sudo chmod 700 /etc/yak-creds
+sudo chown yakob:yakob /etc/yak-creds
+sudo chmod 600 /etc/yak-creds/*
+```
+
+**Usage**:
+- Mount as read-only volume: `-v /etc/yak-creds:/creds:ro`
+- Workers read from `/creds/anthropic-api-key`
+- Requires code changes to spawn-worker.sh
+
+**Current Status**: Not implemented (environment variable approach sufficient)
+
+## Deployment Credential Setup
+
+### Initial VM Provisioning
+
+1. **Provision VM** (see `setup-vm.sh`):
+   ```bash
+   gcloud compute instances create yak-vm \
+     --machine-type=e2-standard-4 \
+     --image-family=ubuntu-2204-lts \
+     --image-project=ubuntu-os-cloud \
+     --boot-disk-size=50GB
+   ```
+
+2. **SSH into VM**:
+   ```bash
+   gcloud compute ssh yak-vm
+   ```
+
+3. **Run setup script** (creates yakob user, installs Docker):
+   ```bash
+   sudo bash setup-vm.sh
+   ```
+
+### API Key Configuration
+
+4. **Set API key in systemd service**:
+   ```bash
+   sudo systemctl edit yak-orchestrator
+   ```
+   
+   Add to the override file:
+   ```ini
+   [Service]
+   Environment="ANTHROPIC_API_KEY=sk-ant-api03-YOUR_KEY_HERE"
+   ```
+
+5. **Verify inheritance**:
+   ```bash
+   sudo systemctl start yak-orchestrator
+   
+   # Check orchestrator has key
+   sudo systemctl show yak-orchestrator | grep ANTHROPIC_API_KEY
+   
+   # Spawn test worker and check logs
+   sudo -u yakob ./spawn-worker.sh --name "test" "echo 'API key present'"
+   docker logs <container-id> 2>&1 | grep -i "api"
+   ```
+
+6. **Secure the service file**:
+   ```bash
+   sudo chmod 600 /etc/systemd/system/yak-orchestrator.service.d/override.conf
+   ```
+
+### Verification Checklist
+
+- [ ] yakob user exists: `id yakob`
+- [ ] API key in systemd service: `sudo systemctl show yak-orchestrator | grep ANTHROPIC`
+- [ ] Service starts successfully: `sudo systemctl status yak-orchestrator`
+- [ ] Workers inherit key: Check container environment with `docker inspect`
+- [ ] Orchestrator can spawn workers: `./spawn-worker.sh --name "test" "echo hello"`
+- [ ] Service file permissions: `ls -l /etc/systemd/system/yak-orchestrator.service.d/`
+
+## Security Best Practices
+
+### Credential Hygiene
+
+- **Never commit credentials** to git repositories
+  - Use `.gitignore` for `.env` files
+  - Scan commits with `git-secrets` or `truffleHog`
+  - Revoke immediately if accidentally committed
+
+- **Use environment variables** for API keys (not files when possible)
+  - Reduces attack surface (no file to steal)
+  - Easier to rotate (update service, restart)
+  - Standard practice for 12-factor apps
+
+- **Restrict file permissions** (600 for files, 700 for directories)
+  - Prevents other users from reading credentials
+  - Use `chmod` and `chown` consistently
+  - Audit with `find /etc -type f -perm /o+r` (find world-readable files)
+
+### Operational Security
+
+- **Rotate keys regularly** (quarterly or after team changes)
+  - Set calendar reminders
+  - Document rotation procedure
+  - Test rotation in staging first
+
+- **Monitor usage** via Anthropic dashboard for anomalies
+  - Check for unexpected usage spikes
+  - Review API call patterns
+  - Set up billing alerts
+
+- **Revoke immediately** if compromise suspected
+  - Follow emergency revocation procedure
+  - Investigate root cause
+  - Rotate all related credentials
+
+### Access Control
+
+- **Limit VM access** to essential personnel only
+  - Use GCP IAM roles (Compute Instance Admin)
+  - Enable OS Login for centralized SSH key management
+  - Audit access logs regularly
+
+- **Restrict sudo access** on the VM
+  - yakob user should NOT have sudo by default
+  - Use separate admin account for system changes
+  - Log all sudo commands (`/var/log/auth.log`)
+
+- **Isolate orchestrator** from other services
+  - Dedicated VM for Yak orchestration
+  - No other applications on same VM
+  - Reduces blast radius of compromise
+
+### Container Security
+
+- **Workers run as non-root** (enforced by spawn-worker.sh)
+  - `--user $(id -u):$(id -g)` flag
+  - Prevents privilege escalation
+  - Limits damage from container breakout
+
+- **Network isolation** (see Two-Phase Network Isolation section)
+  - Default `--network none` prevents exfiltration
+  - Use `--setup-network` only for dependency installation
+  - Monitor network activity during setup phase
+
+- **Resource limits** prevent DoS
+  - `--cpus 2 --memory 4g --pids-limit 512`
+  - Prevents single worker from consuming all resources
+  - Protects orchestrator and other workers
+
+- **Ephemeral containers** (no persistence)
+  - Containers destroyed after task completion
+  - No credential persistence in filesystem
+  - Fresh environment for each task
+
+## Troubleshooting
+
+### API Key Not Found
+
+**Symptom**: Workers fail with "ANTHROPIC_API_KEY not set" error
+
+**Diagnosis**:
+```bash
+# Check yakob's environment
+sudo -u yakob env | grep ANTHROPIC
+
+# Check systemd service
+sudo systemctl show yak-orchestrator | grep ANTHROPIC
+
+# Check container environment
+docker inspect <container-id> | grep ANTHROPIC
+```
+
+**Solutions**:
+1. Verify key is set in systemd service: `sudo systemctl edit yak-orchestrator`
+2. Restart service: `sudo systemctl restart yak-orchestrator`
+3. Check service status: `sudo systemctl status yak-orchestrator`
+4. Verify spawn-worker.sh passes `-e ANTHROPIC_API_KEY` (line 265)
+
+### Permission Denied
+
+**Symptom**: Cannot read credential files or access systemd service
+
+**Diagnosis**:
+```bash
+# Check file permissions
+ls -l /etc/systemd/system/yak-orchestrator.service.d/
+
+# Check current user
+whoami
+
+# Check yakob user permissions
+id yakob
+```
+
+**Solutions**:
+1. Ensure files are owned by yakob: `sudo chown yakob:yakob <file>`
+2. Set correct permissions: `sudo chmod 600 <file>`
+3. Use `sudo -u yakob` to run commands as yakob user
+
+### Key Rotation Failed
+
+**Symptom**: Workers still using old API key after rotation
+
+**Diagnosis**:
+```bash
+# Check if old workers still running
+docker ps --filter "ancestor=yak-worker:latest"
+
+# Check orchestrator service status
+sudo systemctl status yak-orchestrator
+```
+
+**Solutions**:
+1. Kill all existing workers: `docker ps -q --filter "ancestor=yak-worker:latest" | xargs docker kill`
+2. Restart orchestrator: `sudo systemctl restart yak-orchestrator`
+3. Verify new key in service: `sudo systemctl show yak-orchestrator | grep ANTHROPIC`
+4. Spawn test worker to confirm new key works

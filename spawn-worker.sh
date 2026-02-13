@@ -8,14 +8,15 @@ set -euo pipefail
 # all yx instructions inline.
 #
 # Usage:
-#   spawn-worker.sh --cwd <dir> --name <tab-name> [--mode plan|build] "<prompt>"
-#   spawn-worker.sh --cwd ./api --name "api-auth" "Work on auth/api/* tasks..."
+#   spawn-worker.sh --cwd <dir> --name <tab-name> [--mode plan|build] [--task <task>...] "<prompt>"
+#   spawn-worker.sh --cwd ./api --name "api-auth" --task auth/api/login "Work on auth/api/* tasks..."
 #   spawn-worker.sh --cwd ./api --name "api-planner" --mode plan "Plan the auth tasks"
 #
 # Options:
 #   --cwd <dir>       Working directory for the worker (required)
 #   --name <name>     Zellij tab name (required)
 #   --mode <mode>     Agent mode: plan or build (default: build)
+#   --task <task>     Task path to assign to this worker (can be specified multiple times)
 #   --yak-path <dir>  Path to .yaks directory (default: $PWD/.yaks)
 
 YAK_PATH="${YAK_PATH:-$PWD/.yaks}"
@@ -23,6 +24,7 @@ MODE="build"
 CWD=""
 TAB_NAME=""
 PROMPT=""
+TASKS=()
 
 # --- Yak-shaver personalities ------------------------------------------------
 # Each worker gets a random identity. Yakob (the orchestrator) is the supervisor;
@@ -63,6 +65,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--yak-path)
 		YAK_PATH="$2"
+		shift 2
+		;;
+	--task)
+		TASKS+=("$2")
 		shift 2
 		;;
 	*)
@@ -198,6 +204,11 @@ LAYOUT_EOF
 
 # Spawn the worker in a new Zellij tab
 zellij action new-tab --layout "$WORKER_LAYOUT" --name "$DISPLAY_NAME" --cwd "$CWD"
+
+# Write assigned-to field for each task
+for task in "${TASKS[@]}"; do
+	echo "${SHAVER_NAME} ${SHAVER_EMOJI}" | yx field "$task" assigned-to
+done
 
 # Return focus to the previous tab (the orchestrator that called this script)
 sleep 0.3

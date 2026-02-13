@@ -29,6 +29,7 @@ layout {
             pane split_direction="horizontal" size="67%" {
                 pane name="orchestrator" focus=true {
                     command "opencode"
+                    args "--agent" "yakob-orchestrator"
                 }
                 pane size="20%" name="shell (orchestrator)"
             }

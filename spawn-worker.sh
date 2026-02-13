@@ -8,16 +8,18 @@ set -euo pipefail
 # all yx instructions inline.
 #
 # Usage:
-#   spawn-worker.sh --cwd <dir> --name <tab-name> [--mode plan|build] [--task <task>...] "<prompt>"
+#   spawn-worker.sh --cwd <dir> --name <tab-name> [--mode plan|build] [--resources light|default|heavy] [--task <task>...] "<prompt>"
 #   spawn-worker.sh --cwd ./api --name "api-auth" --task auth/api/login "Work on auth/api/* tasks..."
 #   spawn-worker.sh --cwd ./api --name "api-planner" --mode plan "Plan the auth tasks"
+#   spawn-worker.sh --cwd ./api --name "api-heavy" --resources heavy "Work on heavy tasks"
 #
 # Options:
-#   --cwd <dir>       Working directory for the worker (required)
-#   --name <name>     Zellij tab name (required)
-#   --mode <mode>     Agent mode: plan or build (default: build)
-#   --task <task>     Task path to assign to this worker (can be specified multiple times)
-#   --yak-path <dir>  Path to .yaks directory (default: $PWD/.yaks)
+#   --cwd <dir>           Working directory for the worker (required)
+#   --name <name>         Zellij tab name (required)
+#   --mode <mode>         Agent mode: plan or build (default: build)
+#   --resources <profile> Resource profile: light, default, or heavy (default: default)
+#   --task <task>         Task path to assign to this worker (can be specified multiple times)
+#   --yak-path <dir>      Path to .yaks directory (default: $PWD/.yaks)
 
 YAK_PATH="${YAK_PATH:-$PWD/.yaks}"
 MODE="build"
@@ -25,6 +27,8 @@ CWD=""
 TAB_NAME=""
 PROMPT=""
 TASKS=()
+SETUP_NETWORK=false
+RESOURCES="default"
 
 # --- Yak-shaver personalities ------------------------------------------------
 # Each worker gets a random identity. Yakob (the orchestrator) is the supervisor;
@@ -86,6 +90,18 @@ while [[ $# -gt 0 ]]; do
 		TASKS+=("$2")
 		shift 2
 		;;
+	--setup-network)
+		SETUP_NETWORK=true
+		shift
+		;;
+	--resources)
+		RESOURCES="$2"
+		if [[ "$RESOURCES" != "light" && "$RESOURCES" != "default" && "$RESOURCES" != "heavy" ]]; then
+			echo "Error: --resources must be 'light', 'default', or 'heavy'" >&2
+			exit 1
+		fi
+		shift 2
+		;;
 	*)
 		if [[ -z "$PROMPT" ]]; then
 			PROMPT="$1"
@@ -105,8 +121,28 @@ fi
 # Resolve to absolute path
 CWD="$(cd "$CWD" && pwd)"
 
-# Format the tab name with the shaver identity
-DISPLAY_NAME="${SHAVER_NAME} ${SHAVER_EMOJI}"
+# Extract yak title from tasks (strip parent path prefix for conciseness)
+YAK_TITLE=""
+if [[ ${#TASKS[@]} -gt 0 ]]; then
+	# Take the first task, strip parent prefix (e.g. "yurt-poc/openclaw" -> "openclaw")
+	FIRST_TASK="${TASKS[0]}"
+	YAK_TITLE="${FIRST_TASK##*/}"
+
+	# If multiple tasks, join them with commas
+	if [[ ${#TASKS[@]} -gt 1 ]]; then
+		for ((i = 1; i < ${#TASKS[@]}; i++)); do
+			TASK_NAME="${TASKS[$i]##*/}"
+			YAK_TITLE="${YAK_TITLE}, ${TASK_NAME}"
+		done
+	fi
+fi
+
+# Format the tab name with the shaver identity and yak title
+if [[ -n "$YAK_TITLE" ]]; then
+	DISPLAY_NAME="${SHAVER_NAME} ${SHAVER_EMOJI} ${YAK_TITLE}"
+else
+	DISPLAY_NAME="${SHAVER_NAME} ${SHAVER_EMOJI}"
+fi
 
 # Build the inline system prompt that teaches the worker about yx.
 # This is the key design choice: sub-repos have NO CLAUDE.md about orchestration.
@@ -181,19 +217,48 @@ if [[ "$RUNTIME" == "docker" ]]; then
 	WORKSPACE_ROOT="$(git rev-parse --show-toplevel)"
 	CONTAINER_NAME="yak-worker-${TAB_NAME//[^a-zA-Z0-9_-]/}"
 
+	# Determine network mode: bridge for setup phase, none for work phase
+	if [[ "$SETUP_NETWORK" == "true" ]]; then
+		NETWORK_MODE="bridge"
+	else
+		NETWORK_MODE="none"
+	fi
+
+	# Determine resource limits based on profile
+	case "$RESOURCES" in
+	light)
+		CPUS="0.5"
+		MEMORY="1g"
+		PIDS_LIMIT="256"
+		;;
+	default)
+		CPUS="1.0"
+		MEMORY="2g"
+		PIDS_LIMIT="512"
+		;;
+	heavy)
+		CPUS="2.0"
+		MEMORY="4g"
+		PIDS_LIMIT="1024"
+		;;
+	esac
+
 	echo "$WORKER_PROMPT" | docker run \
 		--detach \
 		--name "$CONTAINER_NAME" \
 		--user "$(id -u):$(id -g)" \
-		--network none \
+		--network "$NETWORK_MODE" \
 		--security-opt no-new-privileges \
 		--tmpfs /home/worker/.cache \
-		--cpus 2 \
-		--memory 4g \
-		--pids-limit 512 \
+		--cpus "$CPUS" \
+		--memory "$MEMORY" \
+		--pids-limit "$PIDS_LIMIT" \
+		--stop-timeout 7200 \
 		-v "${WORKSPACE_ROOT}:${WORKSPACE_ROOT}:rw" \
 		-v "${YAK_PATH}:${YAK_PATH}:rw" \
+		-v "$HOME/.gitconfig:$HOME/.gitconfig:ro" \
 		-w "$CWD" \
+		-e HOME="$HOME" \
 		-e WORKER_NAME="$SHAVER_NAME" \
 		-e WORKER_EMOJI="$SHAVER_EMOJI" \
 		-e YAK_PATH="$YAK_PATH" \

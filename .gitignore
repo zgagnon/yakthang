@@ -1,7 +1,9 @@
 .yaks
 .sisyphus
 .worker-cache
+.worker-costs
 
-# OpenClaw - workspace has its own git repo
-/.openclaw/
+# OpenClaw workspace — track identity/memory files, ignore runtime state
+/.openclaw/workspace/.yaks
+
 .opencode/plans/

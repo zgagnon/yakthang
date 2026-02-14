@@ -292,15 +292,15 @@ install_yx() {
 	local CLONE_DIR="/home/yakob/yakthang/tmp/mrdavidlaing-yaks"
 
 	log "Cloning mrdavidlaing/yaks repository (ls-format-flag branch)..."
-	mkdir -p "$(dirname "$CLONE_DIR")"
-	gh repo clone mrdavidlaing/yaks "$CLONE_DIR" -- --branch ls-format-flag
-	chown -R yakob:yakob "$CLONE_DIR"
+	mkdir -p /home/yakob/yakthang/tmp
+	chown -R yakob:yakob /home/yakob
+	su - yakob -c "gh repo clone mrdavidlaing/yaks /home/yakob/yakthang/tmp/mrdavidlaing-yaks -- --branch ls-format-flag"
 
 	log "Building yx from source (as yakob user)..."
-	su - yakob -c "cd '$CLONE_DIR' && source ~/.cargo/env && cargo build --release"
+	su - yakob -c "cd /home/yakob/yakthang/tmp/mrdavidlaing-yaks && source ~/.cargo/env && cargo build --release"
 
 	log "Installing yx binary to /usr/local/bin..."
-	install -m 0755 "$CLONE_DIR/target/release/yx" /usr/local/bin/yx
+	install -m 0755 /home/yakob/yakthang/tmp/mrdavidlaing-yaks/target/release/yx /usr/local/bin/yx
 
 	log "yx installed: $(yx --version)"
 }
@@ -504,6 +504,11 @@ build_worker_image() {
 		log "Please copy worker.Dockerfile to /home/yakob/workspace manually"
 		return 1
 	fi
+
+	# Copy yx binary to workspace (required by Dockerfile)
+	mkdir -p "$workspace/tmp/mrdavidlaing-yaks/target/release"
+	cp /home/yakob/yakthang/tmp/mrdavidlaing-yaks/target/release/yx "$workspace/tmp/mrdavidlaing-yaks/target/release/yx"
+	chown yakob:yakob "$workspace/tmp" -R
 
 	# Check if image already exists
 	if docker image inspect yak-worker:latest &>/dev/null; then

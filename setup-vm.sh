@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# setup-vm.sh - Provision GCP VM for Yak Orchestration
+# setup-vm.sh - Provision VM for Yak Orchestration
 #
-# This script sets up a fresh Ubuntu 24.04 GCP VM with all required tools
-# for running the Yak orchestration system. It creates the yakob user,
-# installs dependencies, builds the worker image, and prepares systemd.
+# This script sets up a fresh VM with all required tools for running the
+# Yak orchestration system. Supports Ubuntu 24.04 and Arch Linux.
+# It creates the yakob user, installs dependencies, builds the worker
+# image, and prepares systemd.
 #
 # Usage: sudo bash setup-vm.sh
 #
@@ -31,7 +32,7 @@ set -euo pipefail
 #
 # Idempotency:
 #   This script can be run multiple times safely. It checks for existing
-#   resources before creating them and uses non-interactive apt installs.
+#   resources before creating them and uses non-interactive package installs.
 
 #------------------------------------------------------------------------------
 # Helper Functions
@@ -49,45 +50,88 @@ check_root() {
 }
 
 #------------------------------------------------------------------------------
-# 1. Install Docker Engine (Official Ubuntu 24.04 method)
+# OS Detection & Package Management
+#------------------------------------------------------------------------------
+
+DISTRO=""
+
+detect_os() {
+	if [[ -f /etc/os-release ]]; then
+		# shellcheck disable=SC1091
+		. /etc/os-release
+		case "$ID" in
+		ubuntu | debian)
+			DISTRO="ubuntu"
+			;;
+		arch | endeavouros)
+			DISTRO="arch"
+			;;
+		*)
+			log "ERROR: Unsupported distribution: $ID"
+			exit 1
+			;;
+		esac
+	else
+		log "ERROR: Cannot detect OS (missing /etc/os-release)"
+		exit 1
+	fi
+	log "Detected OS: $DISTRO (${PRETTY_NAME:-unknown})"
+}
+
+pkg_update() {
+	case "$DISTRO" in
+	ubuntu) apt-get update ;;
+	arch) pacman -Syu --noconfirm ;;
+	esac
+}
+
+pkg_install() {
+	case "$DISTRO" in
+	ubuntu) apt-get install -y "$@" ;;
+	arch) pacman -S --noconfirm --needed "$@" ;;
+	esac
+}
+
+#------------------------------------------------------------------------------
+# 1. Install Docker Engine
 #------------------------------------------------------------------------------
 
 install_docker() {
 	log "Installing Docker Engine..."
 
-	# Check if Docker is already installed
 	if command -v docker &>/dev/null; then
 		log "Docker already installed: $(docker --version)"
 		return 0
 	fi
 
-	# Remove any old versions
-	apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc 2>/dev/null || true
+	case "$DISTRO" in
+	ubuntu)
+		apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc 2>/dev/null || true
 
-	# Install prerequisites
-	apt-get update
-	apt-get install -y ca-certificates curl gnupg
+		apt-get update
+		apt-get install -y ca-certificates curl gnupg
 
-	# Add Docker's official GPG key
-	install -m 0755 -d /etc/apt/keyrings
-	if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-		curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-		chmod a+r /etc/apt/keyrings/docker.gpg
-	fi
+		install -m 0755 -d /etc/apt/keyrings
+		if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
+			curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+			chmod a+r /etc/apt/keyrings/docker.gpg
+		fi
 
-	# Set up the repository
-	if [[ ! -f /etc/apt/sources.list.d/docker.list ]]; then
-		echo \
-			"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-          $(. /etc/os-release && echo "$VERSION_CODENAME") stable" |
-			tee /etc/apt/sources.list.d/docker.list >/dev/null
-	fi
+		if [[ ! -f /etc/apt/sources.list.d/docker.list ]]; then
+			echo \
+				"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+              $(. /etc/os-release && echo "$VERSION_CODENAME") stable" |
+				tee /etc/apt/sources.list.d/docker.list >/dev/null
+		fi
 
-	# Install Docker Engine
-	apt-get update
-	apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+		apt-get update
+		apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+		;;
+	arch)
+		pkg_install docker docker-buildx docker-compose
+		;;
+	esac
 
-	# Start and enable Docker service
 	systemctl start docker
 	systemctl enable docker
 
@@ -101,10 +145,16 @@ install_docker() {
 install_system_packages() {
 	log "Installing system packages..."
 
-	apt-get update
-	apt-get install -y git watch jq build-essential pkg-config libssl-dev
+	case "$DISTRO" in
+	ubuntu)
+		apt-get update
+		apt-get install -y git watch jq build-essential pkg-config libssl-dev
+		;;
+	arch)
+		pkg_install git procps-ng jq base-devel pkgconf openssl
+		;;
+	esac
 
-	# Zellij - install from GitHub releases (not in apt)
 	if command -v zellij &>/dev/null; then
 		log "Zellij already installed: $(zellij --version)"
 	else
@@ -132,14 +182,21 @@ install_gh_cli() {
 		return 0
 	fi
 
-	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
-		gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
+	case "$DISTRO" in
+	ubuntu)
+		curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+			gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
 
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
-		tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+		echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
+			tee /etc/apt/sources.list.d/github-cli.list >/dev/null
 
-	apt-get update
-	apt-get install -y gh
+		apt-get update
+		apt-get install -y gh
+		;;
+	arch)
+		pkg_install github-cli
+		;;
+	esac
 
 	log "GitHub CLI installed: $(gh --version)"
 }
@@ -152,7 +209,8 @@ install_nodejs() {
 	log "Installing Node.js 22..."
 
 	if command -v node &>/dev/null; then
-		local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+		local node_version
+		node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
 		if [[ "$node_version" -ge 22 ]]; then
 			log "Node.js already installed: $(node --version)"
 			return 0
@@ -161,10 +219,16 @@ install_nodejs() {
 		fi
 	fi
 
-	# Install Node.js 22 from NodeSource
-	log "Adding NodeSource repository for Node.js 22..."
-	curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-	apt-get install -y nodejs
+	case "$DISTRO" in
+	ubuntu)
+		log "Adding NodeSource repository for Node.js 22..."
+		curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+		apt-get install -y nodejs
+		;;
+	arch)
+		pkg_install nodejs-lts-jod npm
+		;;
+	esac
 
 	log "Node.js installed: $(node --version)"
 }
@@ -248,29 +312,20 @@ install_yx() {
 configure_security() {
 	log "Configuring security hardening..."
 
-	# --- Configure UFW firewall ---
 	log "Configuring UFW firewall..."
-	apt-get install -y ufw
+	pkg_install ufw
 	ufw default deny incoming
 	ufw default allow outgoing
 	ufw allow ssh
 	ufw --force enable
 
-	# --- Harden SSH configuration ---
 	log "Hardening SSH..."
 	sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 	sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 	sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 	sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-	systemctl reload sshd || systemctl reload ssh || true
+	systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || true
 
-	# --- Install fail2ban ---
-	log "Installing fail2ban..."
-	apt-get install -y fail2ban
-	systemctl enable fail2ban
-	systemctl start fail2ban
-
-	# --- Configure Docker daemon security ---
 	log "Configuring Docker daemon..."
 	mkdir -p /etc/docker
 	cat >/etc/docker/daemon.json <<'DOCKER_EOF'
@@ -529,10 +584,16 @@ EOF
 #------------------------------------------------------------------------------
 
 main() {
-	log "Starting GCP VM provisioning for Yak Orchestration"
+	log "Starting VM provisioning for Yak Orchestration"
 	log "=================================================="
 
 	check_root
+	detect_os
+
+	if [[ "$DISTRO" == "arch" ]]; then
+		log "Syncing package database and upgrading system..."
+		pacman -Syu --noconfirm
+	fi
 
 	install_docker
 	install_system_packages

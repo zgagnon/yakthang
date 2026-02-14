@@ -335,6 +335,29 @@ LAYOUT_EOF
 		echo "${SHAVER_NAME} ${SHAVER_EMOJI}" | yx field "$task" assigned-to
 	done
 
+	# --- Write worker metadata for shutdown ---
+	WORKER_CACHE_DIR="${WORKSPACE_ROOT}/.worker-cache"
+	mkdir -p "$WORKER_CACHE_DIR"
+
+	# Format TASKS as bash array literal
+	TASKS_LITERAL="("
+	for t in "${TASKS[@]}"; do TASKS_LITERAL+="\"$t\" "; done
+	TASKS_LITERAL+=")"
+
+	cat > "${WORKER_CACHE_DIR}/${TAB_NAME}.meta" <<META_EOF
+SHAVER_NAME="${SHAVER_NAME}"
+SHAVER_EMOJI="${SHAVER_EMOJI}"
+DISPLAY_NAME="${DISPLAY_NAME}"
+TAB_NAME="${TAB_NAME}"
+CONTAINER_NAME="${CONTAINER_NAME}"
+RUNTIME="${RUNTIME}"
+CWD="${CWD}"
+SPAWNED_AT=$(date +%s)
+YAK_PATH="${YAK_PATH}"
+ZELLIJ_SESSION_NAME="${ZELLIJ_SESSION_NAME:-}"
+TASKS=${TASKS_LITERAL}
+META_EOF
+
 	sleep 0.3
 	zellij action go-to-previous-tab
 
@@ -384,6 +407,29 @@ LAYOUT_EOF
 	for task in "${TASKS[@]}"; do
 		echo "${SHAVER_NAME} ${SHAVER_EMOJI}" | yx field "$task" assigned-to
 	done
+
+	# --- Write worker metadata for shutdown ---
+	WORKER_CACHE_DIR="${WORKSPACE_ROOT}/.worker-cache"
+	mkdir -p "$WORKER_CACHE_DIR"
+
+	# Format TASKS as bash array literal
+	TASKS_LITERAL="("
+	for t in "${TASKS[@]}"; do TASKS_LITERAL+="\"$t\" "; done
+	TASKS_LITERAL+=")"
+
+	cat > "${WORKER_CACHE_DIR}/${TAB_NAME}.meta" <<META_EOF
+SHAVER_NAME="${SHAVER_NAME}"
+SHAVER_EMOJI="${SHAVER_EMOJI}"
+DISPLAY_NAME="${DISPLAY_NAME}"
+TAB_NAME="${TAB_NAME}"
+CONTAINER_NAME=""
+RUNTIME="${RUNTIME}"
+CWD="${CWD}"
+SPAWNED_AT=$(date +%s)
+YAK_PATH="${YAK_PATH}"
+ZELLIJ_SESSION_NAME="${ZELLIJ_SESSION_NAME:-}"
+TASKS=${TASKS_LITERAL}
+META_EOF
 
 	sleep 0.3
 	if [[ -n "${ZELLIJ_SESSION_NAME:-}" ]]; then

@@ -1,5 +1,6 @@
 .yaks
 .sisyphus
+.worker-cache
 
 # OpenClaw - workspace has its own git repo
 /.openclaw/

@@ -1,6 +1,5 @@
 .yaks
 .sisyphus
 
-# OpenClaw - commit workspace
-/.openclaw/*
-!/.openclaw/workspace/
+# OpenClaw - workspace has its own git repo
+/.openclaw/

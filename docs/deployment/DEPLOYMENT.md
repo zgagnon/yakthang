@@ -67,7 +67,7 @@ no manual copying or import scripts needed.
 
 ```bash
 # Start a Zellij session for workers
-su - yakob -c "zellij --session yak-workers"
+su - yakob -c "zellij --session yakthang"
 
 # Enable and start the gateway
 sudo systemctl enable --now openclaw-gateway

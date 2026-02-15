@@ -24,7 +24,7 @@ Docker containers spawned via `spawn-worker.sh`.
 | Question | Decision |
 |----------|----------|
 | Messaging channel | **Slack** (Socket Mode) |
-| Worker tab creation | **Pre-start Zellij session** -- set `ZELLIJ_SESSION_NAME=yak-workers` in systemd env |
+| Worker tab creation | **Pre-start Zellij session** -- set `ZELLIJ_SESSION_NAME=yakthang` in systemd env |
 | Workspace path | **Project directory** (`/home/yakob/yakthang/.openclaw/workspace`) with `.yaks` symlink |
 | Heartbeat model | **Sonnet 4.5** (same as agent default) |
 | Active hours timezone | **UTC** |
@@ -111,7 +111,7 @@ creates them), but Yakob itself runs headless in the Gateway.
 |  +------------------------------------------------------+   |
 |                                                             |
 |  +------------------------------------------------------+   |
-|  | Zellij Session "yak-workers" (worker tabs + monitor) |   |
+|  | Zellij Session "yakthang" (worker tabs + monitor) |   |
 |  |  +-- yak-map.sh (live yx ls)                         |   |
 |  |  +-- worker tabs (created by spawn-worker.sh)        |   |
 |  +------------------------------------------------------+   |
@@ -434,7 +434,7 @@ WorkingDirectory=/home/yakob/yakthang
 
 # Environment variables for credentials (set via systemctl edit)
 Environment="ANTHROPIC_API_KEY="
-Environment="ZELLIJ_SESSION_NAME=yak-workers"
+Environment="ZELLIJ_SESSION_NAME=yakthang"
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 
 # Optional: Uncomment when adding Slack integration
@@ -481,7 +481,7 @@ The Gateway needs a named Zellij session for `spawn-worker.sh` to create tabs in
 Either start manually or via a companion systemd service:
 
 ```bash
-zellij --session yak-workers
+zellij --session yakthang
 ```
 
 **5.4 Enable and start**
@@ -665,7 +665,7 @@ Exec commands use `workdir: "/home/yakob/yakthang"` to operate in the project.
 | Risk | Mitigation |
 |------|-----------|
 | exec tool can't run spawn-worker.sh | Test in Phase 7; sandboxing is off by default |
-| Zellij tabs don't work from Gateway exec | Pre-start `yak-workers` session; set ZELLIJ_SESSION_NAME |
+| Zellij tabs don't work from Gateway exec | Pre-start `yakthang` session; set ZELLIJ_SESSION_NAME |
 | OpenClaw Gateway instability | systemd auto-restart; workers survive independently |
 | API cost increase (~$30-60/mo) | Acceptable for 24/7 availability; tune frequency if needed |
 
@@ -678,13 +678,13 @@ and the script can't create tabs.
 **Solution:** Pre-start a named Zellij session and set `ZELLIJ_SESSION_NAME` in systemd env:
 ```bash
 # Separate systemd service (zellij-workers.service) starts the session
-zellij --session yak-workers
+zellij --session yakthang
 
 # In openclaw-gateway.service
-Environment="ZELLIJ_SESSION_NAME=yak-workers"
+Environment="ZELLIJ_SESSION_NAME=yakthang"
 ```
 Workers get Zellij tabs as before. Yakob runs headless in the Gateway but spawns
-tabs into the pre-existing `yak-workers` session.
+tabs into the pre-existing `yakthang` session.
 
 ---
 

@@ -10,32 +10,32 @@ import (
 const devcontainerPath = ".devcontainer"
 const workerImageName = "yak-worker:latest"
 
-func IsDevcontainerDirty() (bool, error) {
-	workspaceRoot, err := findWorkspaceRoot()
-	if err != nil {
-		return false, fmt.Errorf("failed to find workspace root: %w", err)
-	}
-
-	devcontainerDir := workspaceRoot + "/" + devcontainerPath
-	info, err := os.Stat(devcontainerDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	if !info.IsDir() {
-		return false, nil
-	}
-
-	cmd := exec.Command("git", "status", "--porcelain", devcontainerPath)
-	cmd.Dir = workspaceRoot
+func getStoredDevcontainerCommit() (string, error) {
+	cmd := exec.Command("docker", "image", "inspect", workerImageName, "--format", "{{index .Config.Labels \"yakthang.devcontainer.commit\"}}")
 	output, err := cmd.Output()
 	if err != nil {
-		return false, fmt.Errorf("failed to check git status: %w", err)
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func isImageUpToDate() (bool, error) {
+	workspaceRoot, err := findWorkspaceRoot()
+	if err != nil {
+		return false, err
 	}
 
-	return strings.TrimSpace(string(output)) != "", nil
+	currentCommit, err := getDevcontainerCommit(workspaceRoot)
+	if err != nil {
+		return false, err
+	}
+
+	storedCommit, err := getStoredDevcontainerCommit()
+	if err != nil {
+		return false, err
+	}
+
+	return currentCommit == storedCommit, nil
 }
 
 func RebuildDevcontainer() error {
@@ -44,9 +44,18 @@ func RebuildDevcontainer() error {
 		return fmt.Errorf("failed to find workspace root: %w", err)
 	}
 
-	fmt.Println("Rebuilding yak-worker image due to .devcontainer changes...")
+	commitHash, err := getDevcontainerCommit(workspaceRoot)
+	if err != nil {
+		return fmt.Errorf("failed to get devcontainer commit: %w", err)
+	}
 
-	cmd := exec.Command("docker", "build", "-t", "yak-worker:latest", "-f", "Dockerfile", ".")
+	fmt.Println("Rebuilding yak-worker image...")
+
+	cmd := exec.Command("docker", "build",
+		"-t", workerImageName,
+		"-f", "Dockerfile",
+		"--label", "yakthang.devcontainer.commit="+commitHash,
+		".")
 	cmd.Dir = workspaceRoot + "/" + devcontainerPath
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -59,22 +68,29 @@ func RebuildDevcontainer() error {
 	return nil
 }
 
+func getDevcontainerCommit(workspaceRoot string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = workspaceRoot + "/" + devcontainerPath
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 // EnsureDevcontainer ensures the Docker image exists and is up-to-date
 func EnsureDevcontainer() error {
-	// Check if image already exists
 	if imageExists, err := ImageExists(); err == nil && imageExists {
-		// Image exists, check if rebuild is needed due to changes
-		dirty, err := IsDevcontainerDirty()
+		upToDate, err := isImageUpToDate()
 		if err != nil {
-			return fmt.Errorf("failed to check devcontainer status: %w", err)
+			return fmt.Errorf("failed to check image status: %w", err)
 		}
-		if dirty {
+		if !upToDate {
 			return RebuildDevcontainer()
 		}
 		return nil
 	}
 
-	// Image doesn't exist, build it
 	fmt.Println("Building yak-worker image for the first time...")
 	return RebuildDevcontainer()
 }

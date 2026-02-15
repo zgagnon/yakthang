@@ -232,9 +232,12 @@ if [[ "$RUNTIME" == "docker" ]]; then
 	WORKSPACE_ROOT="$(git rev-parse --show-toplevel)"
 	CONTAINER_NAME="yak-worker-${TAB_NAME//[^a-zA-Z0-9_-]/}"
 
-	# Network mode: bridge by default (workers need LLM API access)
-	# TODO: implement proper network filtering (see docker-workers/network-filtering)
-	NETWORK_MODE="bridge"
+	# Network mode: yak-workers for filtered network, fallback to bridge if not available
+	if docker network inspect yak-workers >/dev/null 2>&1; then
+		NETWORK_MODE="yak-workers"
+	else
+		NETWORK_MODE="bridge"
+	fi
 
 	# Determine resource limits based on profile
 	case "$RESOURCES" in
@@ -295,9 +298,9 @@ exit $EXIT_CODE
 INNER_EOF
 	chmod +x "$INNER"
 
-	# ANTHROPIC_API_KEY must be set in the environment
-	if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-		echo "Error: ANTHROPIC_API_KEY not set. Docker workers need this to access the LLM API." >&2
+	# OPENCODE_API_KEY must be set in the environment
+	if [[ -z "${OPENCODE_API_KEY:-}" ]]; then
+		echo "Error: OPENCODE_API_KEY not set. Docker workers need this to access the LLM API." >&2
 		exit 1
 	fi
 
@@ -323,7 +326,7 @@ exec docker run -it --rm \\
 	-v "${INNER}:/opt/worker/start.sh:ro" \\
 	-w "$CWD" \\
 	-e HOME=/home/worker \\
-	-e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \\
+	-e OPENCODE_API_KEY="${OPENCODE_API_KEY}" \\
 	-e WORKER_NAME="$SHAVER_NAME" \\
 	-e WORKER_EMOJI="$SHAVER_EMOJI" \\
 	-e YAK_PATH="$YAK_PATH" \\
@@ -367,7 +370,7 @@ LAYOUT_EOF
 	for t in "${TASKS[@]}"; do TASKS_LITERAL+="\"$t\" "; done
 	TASKS_LITERAL+=")"
 
-	cat > "${WORKER_CACHE_DIR}/${TAB_NAME}.meta" <<META_EOF
+	cat >"${WORKER_CACHE_DIR}/${TAB_NAME}.meta" <<META_EOF
 SHAVER_NAME="${SHAVER_NAME}"
 SHAVER_EMOJI="${SHAVER_EMOJI}"
 DISPLAY_NAME="${DISPLAY_NAME}"
@@ -440,7 +443,7 @@ LAYOUT_EOF
 	for t in "${TASKS[@]}"; do TASKS_LITERAL+="\"$t\" "; done
 	TASKS_LITERAL+=")"
 
-	cat > "${WORKER_CACHE_DIR}/${TAB_NAME}.meta" <<META_EOF
+	cat >"${WORKER_CACHE_DIR}/${TAB_NAME}.meta" <<META_EOF
 SHAVER_NAME="${SHAVER_NAME}"
 SHAVER_EMOJI="${SHAVER_EMOJI}"
 DISPLAY_NAME="${DISPLAY_NAME}"

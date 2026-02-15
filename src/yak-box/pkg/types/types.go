@@ -24,6 +24,7 @@ type ResourceProfile struct {
 	Name   string
 	CPUs   string
 	Memory string
+	Swap   string
 	PIDs   int
 	Tmpfs  map[string]string
 }

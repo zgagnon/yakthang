@@ -25,6 +25,7 @@ func GetResourceProfile(name string) types.ResourceProfile {
 			Name:   "light",
 			CPUs:   "0.5",
 			Memory: "1g",
+			Swap:   "",
 			PIDs:   256,
 			Tmpfs: map[string]string{
 				"/tmp":                    "size=1g,exec,uid=1000,gid=1000",
@@ -37,6 +38,7 @@ func GetResourceProfile(name string) types.ResourceProfile {
 			Name:   "heavy",
 			CPUs:   "2.0",
 			Memory: "4g",
+			Swap:   "",
 			PIDs:   1024,
 			Tmpfs: map[string]string{
 				"/tmp":                    "size=2g,exec,uid=1000,gid=1000",
@@ -44,11 +46,25 @@ func GetResourceProfile(name string) types.ResourceProfile {
 				"/home/yak-shaver/.cache": "size=1g,exec,uid=1000,gid=1000",
 			},
 		}
+	case "rust":
+		return types.ResourceProfile{
+			Name:   "rust",
+			CPUs:   "0",
+			Memory: "8g",
+			Swap:   "16g",
+			PIDs:   2048,
+			Tmpfs: map[string]string{
+				"/tmp":                    "size=4g,exec,uid=1000,gid=1000",
+				"/home/yak-shaver":        "size=2g,exec,uid=1000,gid=1000",
+				"/home/yak-shaver/.cache": "size=2g,exec,uid=1000,gid=1000",
+			},
+		}
 	default:
 		return types.ResourceProfile{
 			Name:   "default",
 			CPUs:   "1.0",
 			Memory: "2g",
+			Swap:   "",
 			PIDs:   512,
 			Tmpfs: map[string]string{
 				"/tmp":                    "size=1g,exec,uid=1000,gid=1000",
@@ -129,35 +145,48 @@ exit $EXIT_CODE
 
 	// Create wrapper script that runs docker in background with -d flag for detached
 	wrapperScript := filepath.Join(workerDir, "run.sh")
+
+	// Build swap flag if specified
+	swapFlag := ""
+	if profile.Swap != "" {
+		swapFlag = fmt.Sprintf("\t--memory-swap %s \\\\", profile.Swap)
+	}
+
+	// Add CARGO_BUILD_JOBS for rust profile
+	cargoJobsEnv := ""
+	if profile.Name == "rust" {
+		cargoJobsEnv = "\t-e CARGO_BUILD_JOBS=4 \\"
+	}
+
 	wrapperContent := fmt.Sprintf(`#!/usr/bin/env bash
-exec docker run -it --rm \\
-	--name %s \\
-	--user "%d:%d" \\
-	--network %s \\
-	--security-opt no-new-privileges \\
-	--cap-drop ALL \\
-	--tmpfs /tmp:rw,exec,size=2g \\
-	--tmpfs /home/yak-shaver:rw,exec,size=1g \\
-	--cpus %s \\
-	--memory %s \\
-	--pids-limit %d \\
-	--stop-timeout 7200 \\
-	-v "%s:%s:rw" \\
-	-v "%s:%s:rw" \\
-	-v "%s:/opt/worker/prompt.txt:ro" \\
-	-v "%s:/opt/worker/start.sh:ro" \\
-	-w "%s" \\
+exec docker run -it --rm \
+	--name %s \
+	--user "%d:%d" \
+	--network %s \
+	--security-opt no-new-privileges \
+	--cap-drop ALL \
+	--tmpfs /tmp:rw,exec,size=2g \
+	--tmpfs /home/yak-shaver:rw,exec,size=1g \
+	--cpus %s \
+	--memory %s \
+%s	--pids-limit %d \
+	--stop-timeout 7200 \
+	-v "%s:%s:rw" \
+	-v "%s:%s:rw" \
+	-v "%s:/opt/worker/prompt.txt:ro" \
+	-v "%s:/opt/worker/start.sh:ro" \
+	-w "%s" \
 	-e HOME=/home/yak-shaver \
 	-e GOPATH=/home/yak-shaver/.go \
 	-e CARGO_HOME=/home/yak-shaver/.cargo \
 	-e RUSTUP_HOME=/home/yak-shaver/.rustup \
-	-e OPENCODE_API_KEY="${OPENCODE_API_KEY}" \\
-	-e WORKER_NAME="%s" \\
-	-e WORKER_EMOJI="%s" \\
-	-e YAK_PATH="%s" \\
-	yak-shaver:latest \\
+%s	-e OPENCODE_API_KEY="${OPENCODE_API_KEY}" \
+	-e WORKER_NAME="%s" \
+	-e WORKER_EMOJI="%s" \
+	-e YAK_PATH="%s" \
+	yak-shaver:latest \
 	bash /opt/worker/start.sh build
-`, containerName, os.Getuid(), os.Getgid(), networkMode, profile.CPUs, profile.Memory, profile.PIDs, workspaceRoot, workspaceRoot, worker.YakPath, worker.YakPath, promptFile, innerScript, worker.CWD, persona.Name, persona.Emoji, worker.YakPath)
+`, containerName, os.Getuid(), os.Getgid(), networkMode, profile.CPUs, profile.Memory, swapFlag, profile.PIDs, workspaceRoot, workspaceRoot, worker.YakPath, worker.YakPath, promptFile, innerScript, worker.CWD, cargoJobsEnv, persona.Name, persona.Emoji, worker.YakPath)
 
 	if err := os.WriteFile(wrapperScript, []byte(wrapperContent), 0755); err != nil {
 		return fmt.Errorf("failed to write wrapper script: %w", err)

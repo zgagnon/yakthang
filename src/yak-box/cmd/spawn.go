@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -89,15 +90,30 @@ func runSpawn(args []string) error {
 		displayName += " " + yakTitle
 	}
 
+	// Sanitize spawnName for use as Docker container name (only allow [a-zA-Z0-9_-])
+	sanitizedName := strings.ReplaceAll(spawnName, " ", "-")
+	sanitizedName = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return -1
+	}, sanitizedName)
+
 	worker := &types.Worker{
 		Name:          spawnName,
 		DisplayName:   displayName,
-		ContainerName: "yak-worker-" + spawnName,
+		ContainerName: "yak-worker-" + sanitizedName,
 		Runtime:       runtimeType,
 		CWD:           absCWD,
 		YakPath:       spawnYakPath,
 		Tasks:         spawnYaks,
 		SpawnedAt:     time.Now(),
+	}
+
+	if runtimeType == "sandboxed" {
+		if err := runtime.EnsureDevcontainer(); err != nil {
+			return fmt.Errorf("failed to ensure devcontainer: %w", err)
+		}
 	}
 
 	if runtimeType == "sandboxed" {
@@ -136,6 +152,7 @@ func init() {
 	spawnCmd.Flags().StringVar(&spawnMode, "mode", "build", "Agent mode: 'plan' or 'build'")
 	spawnCmd.Flags().StringVar(&spawnResources, "resources", "default", "Resource profile: 'light', 'default', or 'heavy'")
 	spawnCmd.Flags().StringSliceVar(&spawnYaks, "yaks", []string{}, "Yak paths from .yaks/ to assign (can be repeated)")
+	spawnCmd.Flags().StringSliceVar(&spawnYaks, "task", []string{}, "Alias for --yaks")
 	spawnCmd.Flags().StringVar(&spawnYakPath, "yak-path", ".yaks", "Path to task state directory")
 	spawnCmd.Flags().StringVar(&spawnRuntime, "runtime", "auto", "Runtime: 'auto', 'sandboxed', or 'native'")
 }

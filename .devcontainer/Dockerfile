@@ -20,9 +20,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN wget -q https://go.dev/dl/go1.26.0.linux-amd64.tar.gz && \
     tar -C /usr/local -xzf go1.26.0.linux-amd64.tar.gz && \
     rm go1.26.0.linux-amd64.tar.gz
-ENV PATH="/usr/local/go/bin:${PATH}"
+ENV PATH="/usr/local/go/bin:/go/bin:${PATH}"
 ENV GOPATH="/go"
 ENV GO111MODULE=on
+
+# Install gopls (Go language server for LSP)
+RUN go install golang.org/x/tools/gopls@latest
 
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
@@ -36,9 +39,8 @@ RUN curl -fsSL https://opencode.ai/install | bash && \
     cp /root/.opencode/bin/opencode /usr/local/bin/opencode && \
     chmod +x /usr/local/bin/opencode
 
-# Install yx (pre-built binary copied from host)
-COPY yx /usr/local/bin/yx
-RUN chmod +x /usr/local/bin/yx
+COPY yx /usr/local/bin/yx 2>/dev/null || true
+RUN (test -f /usr/local/bin/yx && chmod +x /usr/local/bin/yx) || true
 
 # Trust any mounted workspace (container runs as root, repo owned by host user)
 RUN git config --global --add safe.directory '*'

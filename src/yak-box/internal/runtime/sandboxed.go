@@ -27,9 +27,9 @@ func GetResourceProfile(name string) types.ResourceProfile {
 			Memory: "1g",
 			PIDs:   256,
 			Tmpfs: map[string]string{
-				"/tmp":                   "size=1g,exec,uid=1000,gid=1000",
-				"/home/worker":           "size=512m,exec,uid=1000,gid=1000",
-				"/home/worker/.cache":    "size=512m,exec,uid=1000,gid=1000",
+				"/tmp":                "size=1g,exec,uid=1000,gid=1000",
+				"/home/worker":        "size=512m,exec,uid=1000,gid=1000",
+				"/home/worker/.cache": "size=512m,exec,uid=1000,gid=1000",
 			},
 		}
 	case "heavy":
@@ -39,9 +39,9 @@ func GetResourceProfile(name string) types.ResourceProfile {
 			Memory: "4g",
 			PIDs:   1024,
 			Tmpfs: map[string]string{
-				"/tmp":                   "size=2g,exec,uid=1000,gid=1000",
-				"/home/worker":           "size=1g,exec,uid=1000,gid=1000",
-				"/home/worker/.cache":    "size=1g,exec,uid=1000,gid=1000",
+				"/tmp":                "size=2g,exec,uid=1000,gid=1000",
+				"/home/worker":        "size=1g,exec,uid=1000,gid=1000",
+				"/home/worker/.cache": "size=1g,exec,uid=1000,gid=1000",
 			},
 		}
 	default:
@@ -51,9 +51,9 @@ func GetResourceProfile(name string) types.ResourceProfile {
 			Memory: "2g",
 			PIDs:   512,
 			Tmpfs: map[string]string{
-				"/tmp":                   "size=1g,exec,uid=1000,gid=1000",
-				"/home/worker":           "size=512m,exec,uid=1000,gid=1000",
-				"/home/worker/.cache":    "size=512m,exec,uid=1000,gid=1000",
+				"/tmp":                "size=1g,exec,uid=1000,gid=1000",
+				"/home/worker":        "size=512m,exec,uid=1000,gid=1000",
+				"/home/worker/.cache": "size=512m,exec,uid=1000,gid=1000",
 			},
 		}
 	}
@@ -81,7 +81,7 @@ func GetNetworkMode() string {
 	return networkName
 }
 
-// SpawnSandboxedWorker spawns a worker in a Docker container
+// SpawnSandboxedWorker spawns a worker in a Docker container via Zellij tab
 func SpawnSandboxedWorker(worker *types.Worker, persona *types.Persona, prompt string, profile types.ResourceProfile) error {
 	containerName := containerNamePrefix + worker.Name
 	networkMode := GetNetworkMode()
@@ -90,12 +90,12 @@ func SpawnSandboxedWorker(worker *types.Worker, persona *types.Persona, prompt s
 		return fmt.Errorf("failed to find workspace root: %w", err)
 	}
 
-	// Create worker directory for temp files
+	// Create worker directory for temp files (persist until Zellij starts)
 	workerDir, err := os.MkdirTemp("", "worker-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer os.RemoveAll(workerDir)
+	// Don't clean up immediately - let Zellij use it
 
 	// Write prompt to file
 	promptFile := filepath.Join(workerDir, "prompt.txt")
@@ -127,43 +127,91 @@ exit $EXIT_CODE
 		return fmt.Errorf("failed to write inner script: %w", err)
 	}
 
-	// Build docker run command
-	dockerArgs := []string{
-		"run", "-it", "--rm",
-		"--name", containerName,
-		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
-		"--network", networkMode,
-		"--security-opt", "no-new-privileges",
-		"--cap-drop", "ALL",
-		"--read-only",
-		"--tmpfs", "/tmp:rw,exec,size=2g",
-		"--tmpfs", "/home/worker:rw,exec,size=1g",
-		"--cpus", profile.CPUs,
-		"--memory", profile.Memory,
-		"--pids-limit", fmt.Sprintf("%d", profile.PIDs),
-		"--stop-timeout", "7200",
-		"-v", fmt.Sprintf("%s:%s:rw", workspaceRoot, workspaceRoot),
-		"-v", fmt.Sprintf("%s:%s:rw", worker.YakPath, worker.YakPath),
-		"-v", fmt.Sprintf("%s:/opt/worker/prompt.txt:ro", promptFile),
-		"-v", fmt.Sprintf("%s:/opt/worker/start.sh:ro", innerScript),
-		"-w", worker.CWD,
-		"-e", "HOME=/home/worker",
-		"-e", fmt.Sprintf("OPENCODE_API_KEY=%s", os.Getenv("OPENCODE_API_KEY")),
-		"-e", fmt.Sprintf("WORKER_NAME=%s", persona.Name),
-		"-e", fmt.Sprintf("WORKER_EMOJI=%s", persona.Emoji),
-		"-e", fmt.Sprintf("YAK_PATH=%s", worker.YakPath),
-		"yak-worker:latest",
-		"bash", "/opt/worker/start.sh", "build",
+	// Create wrapper script that runs docker in background with -d flag for detached
+	wrapperScript := filepath.Join(workerDir, "run.sh")
+	wrapperContent := fmt.Sprintf(`#!/usr/bin/env bash
+exec docker run -it --rm \\
+	--name %s \\
+	--user "%d:%d" \\
+	--network %s \\
+	--security-opt no-new-privileges \\
+	--cap-drop ALL \\
+	--read-only \\
+	--tmpfs /tmp:rw,exec,size=2g \\
+	--tmpfs /home/worker:rw,exec,size=1g \\
+	--cpus %s \\
+	--memory %s \\
+	--pids-limit %d \\
+	--stop-timeout 7200 \\
+	-v "%s:%s:rw" \\
+	-v "%s:%s:rw" \\
+	-v "%s:/opt/worker/prompt.txt:ro" \\
+	-v "%s:/opt/worker/start.sh:ro" \\
+	-w "%s" \\
+	-e HOME=/home/worker \\
+	-e OPENCODE_API_KEY="${OPENCODE_API_KEY}" \\
+	-e WORKER_NAME="%s" \\
+	-e WORKER_EMOJI="%s" \\
+	-e YAK_PATH="%s" \\
+	yak-worker:latest \\
+	bash /opt/worker/start.sh build
+`, containerName, os.Getuid(), os.Getgid(), networkMode, profile.CPUs, profile.Memory, profile.PIDs, workspaceRoot, workspaceRoot, worker.YakPath, worker.YakPath, promptFile, innerScript, worker.CWD, persona.Name, persona.Emoji, worker.YakPath)
+
+	if err := os.WriteFile(wrapperScript, []byte(wrapperContent), 0755); err != nil {
+		return fmt.Errorf("failed to write wrapper script: %w", err)
 	}
 
-	cmd := exec.Command("docker", dockerArgs...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Create Zellij layout file
+	layoutFile := filepath.Join(workerDir, "layout.kdl")
+	layoutContent := fmt.Sprintf(`layout {
+    tab name="%s" {
+        pane size=1 borderless=true {
+            plugin location="compact-bar"
+        }
+        pane size="67%%" name="opencode (build) [docker]" focus=true {
+            command "bash"
+            args "%s"
+        }
+        pane size="33%%" name="shell: %s"
+        pane size=2 borderless=true {
+            plugin location="status-bar"
+        }
+    }
+}
+`, worker.DisplayName, wrapperScript, worker.CWD)
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to run docker container: %w", err)
+	if err := os.WriteFile(layoutFile, []byte(layoutContent), 0644); err != nil {
+		return fmt.Errorf("failed to write layout file: %w", err)
 	}
+
+	// Spawn Zellij tab with the layout
+	var zellijCmd *exec.Cmd
+	sessionName := os.Getenv("ZELLIJ_SESSION_NAME")
+	if sessionName != "" {
+		zellijCmd = exec.Command("zellij", "--session", sessionName, "action", "new-tab", "--layout", layoutFile, "--name", worker.DisplayName)
+	} else {
+		zellijCmd = exec.Command("zellij", "action", "new-tab", "--layout", layoutFile, "--name", worker.DisplayName)
+	}
+
+	if err := zellijCmd.Run(); err != nil {
+		return fmt.Errorf("failed to create Zellij tab: %w", err)
+	}
+
+	// Small delay then go back to previous tab
+	time.Sleep(300 * time.Millisecond)
+	var prevTabCmd *exec.Cmd
+	if sessionName != "" {
+		prevTabCmd = exec.Command("zellij", "--session", sessionName, "action", "go-to-previous-tab")
+	} else {
+		prevTabCmd = exec.Command("zellij", "action", "go-to-previous-tab")
+	}
+	prevTabCmd.Run()
+
+	// Clean up temp files after a delay (give Zellij time to read them)
+	go func() {
+		time.Sleep(5 * time.Second)
+		os.RemoveAll(workerDir)
+	}()
 
 	return nil
 }

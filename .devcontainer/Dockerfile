@@ -27,12 +27,15 @@ ENV GO111MODULE=on
 # Install gopls (Go language server for LSP)
 RUN go install golang.org/x/tools/gopls@latest
 
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-ENV PATH="/root/.cargo/bin:${PATH}"
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    RUSTUP_HOME=/opt/rustup \
+    CARGO_HOME=/opt/cargo \
+    sh -s -- -y --default-toolchain stable --no-modify-path
+ENV PATH="/opt/cargo/bin:${PATH}"
+ENV RUSTUP_HOME=/opt/rustup
+ENV CARGO_HOME=/opt/cargo
 
-# Add wasm targets
-RUN . /root/.cargo/env && rustup target add wasm32-wasip1
+RUN rustup target add wasm32-wasip1
 
 # Install OpenCode CLI
 RUN curl -fsSL https://opencode.ai/install | bash && \
@@ -40,7 +43,7 @@ RUN curl -fsSL https://opencode.ai/install | bash && \
     chmod +x /usr/local/bin/opencode
 
 COPY yx /usr/local/bin/yx 2>/dev/null || true
-RUN (test -f /usr/local/bin/yx && chmod +x /usr/local/bin/yx) || true
+RUN if [ -f /usr/local/bin/yx ]; then chmod +x /usr/local/bin/yx; fi
 
 # Trust any mounted workspace (container runs as root, repo owned by host user)
 RUN git config --global --add safe.directory '*'

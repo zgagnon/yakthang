@@ -136,7 +136,6 @@ exec docker run -it --rm \\
 	--network %s \\
 	--security-opt no-new-privileges \\
 	--cap-drop ALL \\
-	--read-only \\
 	--tmpfs /tmp:rw,exec,size=2g \\
 	--tmpfs /home/worker:rw,exec,size=1g \\
 	--cpus %s \\

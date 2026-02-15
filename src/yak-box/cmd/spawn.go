@@ -112,29 +112,16 @@ func runSpawn(args []string) error {
 
 	if runtimeType == "sandboxed" {
 		if err := runtime.EnsureDevcontainer(); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to ensure devcontainer: %v\n", err)
-			fmt.Fprintf(os.Stderr, "Falling back to native runtime...\n")
-			runtimeType = "native"
-			worker.Runtime = runtimeType
+			return fmt.Errorf("failed to ensure devcontainer: %w\n\nTo try native mode instead, run:\n  yak-box spawn --runtime=native [same options]", err)
 		}
-	}
 
-	spawned := false
-	if runtimeType == "sandboxed" {
-		err := runtime.SpawnSandboxedWorker(worker, &persona, workerPrompt, profile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to spawn sandboxed worker: %v\n", err)
-			fmt.Fprintf(os.Stderr, "Falling back to native runtime...\n")
-		} else {
-			spawned = true
+		if err := runtime.SpawnSandboxedWorker(worker, &persona, workerPrompt, profile); err != nil {
+			return fmt.Errorf("failed to spawn sandboxed worker: %w\n\nTo try native mode instead, run:\n  yak-box spawn --runtime=native [same options]", err)
 		}
-	}
-
-	if !spawned {
+	} else {
 		if err := runtime.SpawnNativeWorker(worker, &persona, workerPrompt); err != nil {
-			return fmt.Errorf("failed to spawn worker: %w\nNote: Neither Docker nor Zellij are available in this environment", err)
+			return fmt.Errorf("failed to spawn native worker: %w", err)
 		}
-		runtimeType = "native"
 	}
 
 	if err := metadata.SaveMetadata(worker, &persona, spawnYaks); err != nil {

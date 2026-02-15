@@ -48,6 +48,9 @@ RUN if [ -f /usr/local/bin/yx ]; then chmod +x /usr/local/bin/yx; fi
 # Trust any mounted workspace (container runs as root, repo owned by host user)
 RUN git config --global --add safe.directory '*'
 
+# Allow passwordless sudo so host user can install packages when needed
+RUN echo 'ALL ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
 # Create workspace
 WORKDIR /workspace
 

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "agents": {
+    "sisyphus": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "prometheus": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "metis": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "momus": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "oracle": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "librarian": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "explore": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "atlas": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "multimodal-looker": {
+      "model": "opencode/kimi-k2.5"
+    }
+  },
+  "categories": {
+    "visual-engineering": {
+      "model": "opencode/kimi-k2.5"
+    },
+    "ultrabrain": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "deep": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "artistry": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "quick": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "unspecified-low": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "unspecified-high": {
+      "model": "opencode/minimax-m2.5"
+    },
+    "writing": {
+      "model": "opencode/minimax-m2.5"
+    }
+  }
+}

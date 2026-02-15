@@ -1,12 +1,12 @@
 [package]
-name = "yak-map"
+name = "yak_map"
 version = "0.1.0"
 edition = "2021"
 authors = ["Yakob <yakob@openod>"]
 
-[lib]
+[[bin]]
+name = "yak-map"
 path = "src/main.rs"
-crate-type = ["cdylib"]
 
 [dependencies]
 zellij-tile = "0.43"

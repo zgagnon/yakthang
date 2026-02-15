@@ -81,6 +81,9 @@ impl TaskRepository {
             state,
             assigned_to: self.get_field(path, "assigned-to"),
             agent_status: self.get_field(path, "agent-status"),
+            has_children: false,
+            is_last_sibling: false,
+            ancestor_continuations: Vec::new(),
         }
     }
 }
@@ -101,6 +104,9 @@ pub struct TaskLine {
     state: TaskState,
     assigned_to: Option<String>,
     agent_status: Option<String>,
+    has_children: bool,
+    is_last_sibling: bool,
+    ancestor_continuations: Vec<bool>,
 }
 
 impl Default for TaskLine {
@@ -112,6 +118,9 @@ impl Default for TaskLine {
             state: TaskState::Todo,
             assigned_to: None,
             agent_status: None,
+            has_children: false,
+            is_last_sibling: false,
+            ancestor_continuations: Vec::new(),
         }
     }
 }
@@ -119,10 +128,79 @@ impl Default for TaskLine {
 impl State {
     fn refresh_tasks(&mut self) {
         let task_paths = self.repository.list_tasks();
-        self.tasks = task_paths
+        let mut tasks: Vec<TaskLine> = task_paths
             .into_iter()
             .map(|(path, depth)| self.repository.get_task(&path, depth))
             .collect();
+
+        if tasks.is_empty() {
+            self.tasks = tasks;
+            return;
+        }
+
+        let path_to_index: std::collections::HashMap<String, usize> = tasks
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (t.path.clone(), i))
+            .collect();
+
+        for i in 0..tasks.len() {
+            let path = &tasks[i].path;
+            let prefix = format!("{}/", path);
+            tasks[i].has_children = tasks.iter().any(|t| t.path.starts_with(&prefix));
+        }
+
+        let mut by_parent: std::collections::BTreeMap<String, Vec<usize>> =
+            std::collections::BTreeMap::new();
+        for (i, task) in tasks.iter().enumerate() {
+            let parent = match task.path.rfind('/') {
+                Some(pos) => task.path[..pos].to_string(),
+                None => String::new(),
+            };
+            by_parent.entry(parent).or_default().push(i);
+        }
+
+        for indices in by_parent.values() {
+            if let Some(&last) = indices.last() {
+                tasks[last].is_last_sibling = true;
+            }
+        }
+
+        for i in 0..tasks.len() {
+            let path = &tasks[i].path;
+            let mut continuations = Vec::new();
+            let mut current = if let Some(pos) = path.rfind('/') {
+                Some(path[..pos].to_string())
+            } else {
+                None
+            };
+
+            while let Some(parent) = current {
+                if let Some(&parent_idx) = path_to_index.get(&parent) {
+                    let siblings = by_parent.get(&parent).map(|v| v.as_slice()).unwrap_or(&[]);
+                    let pos_in_siblings = siblings.iter().position(|&x| x == i);
+                    if let Some(pos) = pos_in_siblings {
+                        let is_not_last = pos + 1 < siblings.len();
+                        continuations.push(is_not_last);
+                    }
+
+                    current = if let Some(pos) = parent.rfind('/') {
+                        Some(parent[..pos].to_string())
+                    } else {
+                        None
+                    };
+                } else {
+                    current = if let Some(pos) = parent.rfind('/') {
+                        Some(parent[..pos].to_string())
+                    } else {
+                        None
+                    };
+                }
+            }
+            tasks[i].ancestor_continuations = continuations;
+        }
+
+        self.tasks = tasks;
 
         if self.selected_index >= self.tasks.len() && !self.tasks.is_empty() {
             self.selected_index = self.tasks.len() - 1;
@@ -143,7 +221,7 @@ impl State {
         }
         match task.state {
             TaskState::Wip => "\x1b[33m",
-            TaskState::Done => "\x1b[32m",
+            TaskState::Done => "\x1b[90m",
             TaskState::Todo => "\x1b[37m",
         }
     }
@@ -163,28 +241,57 @@ impl State {
         }
     }
 
-    fn render_task(&self, task: &TaskLine) -> String {
-        let indent = "  ".repeat(task.depth);
-        let color = self.task_color(task);
-        let status = self.status_symbol(task);
-
-        let mut line = format!("{}{}{} {} ", indent, color, status, task.name);
-
-        if let Some(assigned) = &task.assigned_to {
-            line.push_str(&format!("\x1b[36m[{}]\x1b[0m ", assigned));
+    fn tree_prefix(&self, task: &TaskLine) -> String {
+        if task.depth == 0 {
+            return String::new();
         }
 
-        if let Some(status) = &task.agent_status {
-            if status.starts_with("wip:") {
-                line.push_str(&format!("\x1b[33m{}\x1b[0m", status));
-            } else if status.starts_with("done:") {
-                line.push_str(&format!("\x1b[32m{}\x1b[0m", status));
-            } else if status.starts_with("blocked:") {
-                line.push_str(&format!("\x1b[31m{}\x1b[0m", status));
+        let mut prefix = String::new();
+        for (i, &continues) in task.ancestor_continuations.iter().enumerate() {
+            if i == task.ancestor_continuations.len() - 1 {
+                break;
+            }
+            if continues {
+                prefix.push_str("│  ");
+            } else {
+                prefix.push_str("   ");
             }
         }
 
-        line
+        if task.depth == 1 {
+            if task.is_last_sibling {
+                prefix.push_str("╰─ ");
+            } else {
+                prefix.push_str("├─ ");
+            }
+        } else if task.is_last_sibling {
+            prefix.push_str("╰─ ");
+        } else {
+            prefix.push_str("├─ ");
+        }
+
+        prefix
+    }
+
+    fn render_task(&self, task: &TaskLine) -> String {
+        let prefix = self.tree_prefix(task);
+        let status = self.status_symbol(task);
+
+        let color = self.task_color(task);
+
+        let name = if matches!(task.state, TaskState::Done) {
+            format!("\x1b[9m{}\x1b[0m", task.name)
+        } else {
+            task.name.clone()
+        };
+
+        let status_color = if matches!(task.state, TaskState::Done) {
+            "\x1b[90m"
+        } else {
+            color
+        };
+
+        format!("{}{}{} {} ", prefix, status_color, status, name)
     }
 }
 
@@ -245,10 +352,6 @@ impl ZellijPlugin for State {
     }
 
     fn render(&mut self, rows: usize, cols: usize) {
-        let title = "\x1b[1;37m── yak-map ──\x1b[0m";
-        println!("{}", title);
-        println!();
-
         if let Some(error) = &self.error {
             println!("\x1b[31mError: {}\x1b[0m", error);
             return;

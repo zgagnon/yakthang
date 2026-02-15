@@ -1,0 +1,19 @@
+{
+  "name": "yak-dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {},
+  "workspaceFolder": "/workspace",
+  "remoteUser": "root",
+  "postCreateCommand": "git config --global --add safe.directory '*'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "golang.go"
+      ]
+    }
+  }
+}

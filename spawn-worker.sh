@@ -330,7 +330,7 @@ exec docker run -it --rm \\
 	-e WORKER_NAME="$SHAVER_NAME" \\
 	-e WORKER_EMOJI="$SHAVER_EMOJI" \\
 	-e YAK_PATH="$YAK_PATH" \\
-	yak-worker:latest \\
+	yak-devcontainer:latest \\
 	bash /opt/worker/start.sh ${MODE}
 WRAPPER_EOF
 	chmod +x "$WRAPPER"

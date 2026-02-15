@@ -59,11 +59,11 @@ compute_cost() {
     if [[ -v "PRICING[$model]" ]]; then
         read -r i o c_r c_w <<< "${PRICING[$model]}"
         # Prices per 1M tokens
-        input_cost=$(echo "scale=6; $input * $i / 1000000" | bc)
-        output_cost=$(echo "scale=6; $output * $o / 1000000" | bc)
-        cache_read_cost=$(echo "scale=6; $cache_read * $c_r / 1000000" | bc)
-        cache_write_cost=$(echo "scale=6; $cache_write * $c_w / 1000000" | bc)
-        total=$(echo "scale=6; $input_cost + $output_cost + $cache_read_cost + $cache_write_cost" | bc)
+        input_cost=$(awk "BEGIN {printf \"%.6f\", $input * $i / 1000000}")
+        output_cost=$(awk "BEGIN {printf \"%.6f\", $output * $o / 1000000}")
+        cache_read_cost=$(awk "BEGIN {printf \"%.6f\", $cache_read * $c_r / 1000000}")
+        cache_write_cost=$(awk "BEGIN {printf \"%.6f\", $cache_write * $c_w / 1000000}")
+        total=$(awk "BEGIN {printf \"%.6f\", $input_cost + $output_cost + $cache_read_cost + $cache_write_cost}")
         echo "$total"
     else
         echo "0"
@@ -126,11 +126,11 @@ for key in "${!session_files[@]}"; do
         fi
         
         if [[ -n "$cost" && "$cost" != "null" ]]; then
-            type_costs["$type"]=$(echo "${type_costs[$type]:-0} + $cost" | bc)
-            total_cost=$(echo "$total_cost + $cost" | bc)
+        type_costs["$type"]=$(awk "BEGIN {print ${type_costs[$type]:-0} + $cost}")
+        total_cost=$(awk "BEGIN {print $total_cost + $cost}")
             
             if [[ -n "$model" && "$model" != "null" ]]; then
-                model_costs["$model"]=$(echo "${model_costs[$model]:-0} + $cost" | bc)
+                model_costs["$model"]=$(awk "BEGIN {print ${model_costs[$model]:-0} + $cost}")
             fi
         fi
     done < "$session_file"
@@ -143,7 +143,7 @@ echo ""
 
 for type in interactive cron slack heartbeat; do
     cost="${type_costs[$type]:-0}"
-    if [[ "$(echo "$cost > 0.001" | bc)" -eq 1 ]]; then
+    if [[ $(awk "BEGIN {print ($cost > 0.001)}") -eq 1 ]]; then
         printf "%-20s \$%.2f\n" "${type^}:" "$cost"
     fi
 done
@@ -155,9 +155,9 @@ echo "By Model:"
 for model in "${!model_costs[@]}"; do
     cost="${model_costs[$model]}"
     # Skip zero-cost or delivery models
-    if [[ "$(echo "$cost > 0.001" | bc)" -eq 0 || "$model" == "delivery-mirror" ]]; then
+    if [[ $(awk "BEGIN {print ($cost > 0.001)}") -eq 0 || "$model" == "delivery-mirror" ]]; then
         continue
     fi
-    pct=$(echo "scale=1; $cost * 100 / $total_cost" | bc)
+    pct=$(awk "BEGIN {printf \"%.1f\", $cost * 100 / $total_cost}")
     printf "  %-20s \$%.2f (%s%%)\n" "$model:" "$cost" "$pct"
 done

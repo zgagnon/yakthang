@@ -74,28 +74,16 @@ if [[ -d "$WORKER_COSTS" ]]; then
         # Extract worker name from filename (e.g., Yakriel-20260214T123456Z.json)
         worker=$(basename "$json_file" | cut -d'-' -f1)
         
-        # Sum costs from session export
-        cost=$(python3 -c "
-import json, sys
-total = 0
-with open('${json_file}') as f:
-    data = json.load(f)
-    for msg in data.get('messages', []):
-        cost = msg.get('cost', {})
-        if isinstance(cost, dict):
-            total += cost.get('total', 0)
-        elif isinstance(cost, (int, float)):
-            total += cost
-print(total)
-" 2>/dev/null || echo "0")
+        # Sum costs from session export - find all "cost": number patterns
+        cost=$(grep -oP '"cost":\s*\K[0-9.]+' "$json_file" 2>/dev/null | awk '{sum+=$1} END {print sum+0}')
         
-        worker_costs["$worker"]=$(echo "${worker_costs[$worker]:-0} + $cost" | bc 2>/dev/null || echo "0")
+        worker_costs["$worker"]=$(awk "BEGIN {print ${worker_costs[$worker]:-0} + $cost}" 2>/dev/null || echo "0")
     done
     
     total_worker_cost=0
     for worker in "${!worker_costs[@]}"; do
         cost="${worker_costs[$worker]}"
-        total_worker_cost=$(echo "$total_worker_cost + $cost" | bc 2>/dev/null || echo "$total_worker_cost")
+        total_worker_cost=$(awk "BEGIN {print $total_worker_cost + $cost}" 2>/dev/null || echo "$total_worker_cost")
         printf "  %-20s \$%.2f\n" "$worker:" "$cost"
     done
     
@@ -111,7 +99,7 @@ fi
 echo ""
 
 # Grand total
-grand_total=$(echo "$openclaw_cost + $total_worker_cost" | bc)
+grand_total=$(awk -v oc="$openclaw_cost" -v wc="$total_worker_cost" 'BEGIN {print oc + wc}')
 printf "                          Total: \$%.2f\n" "$grand_total"
 
 # Model breakdown (combine both sources if available)
@@ -134,8 +122,10 @@ if [[ "$APPEND_CSV" == "true" ]]; then
     fi
     
     # Count sessions and workers
-    sessions=$(${OPENCLAW_SCRIPT} "$DAYS" 2>/dev/null | grep -c "Interactive\|Cron\|Slack\|Heartbeat" || echo "0")
-    workers=$(find "$WORKER_COSTS" -name "*.json" -mtime -1 2>/dev/null | wc -l)
+    sessions=$(${OPENCLAW_SCRIPT} "$DAYS" 2>/dev/null | grep -c "Interactive\|Cron\|Slack\|Heartbeat" || true)
+    [[ -z "$sessions" ]] && sessions=0
+    workers=$(find "$WORKER_COSTS" -name "*.json" -mtime 0 2>/dev/null | wc -l)
+    [[ -z "$workers" ]] && workers=0
     
     echo "${DATE_STR},${openclaw_cost},${total_worker_cost},${grand_total},${sessions},${workers}" >> "$CSV_FILE"
     echo "" 

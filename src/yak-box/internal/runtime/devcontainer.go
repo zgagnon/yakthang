@@ -35,7 +35,29 @@ func isImageUpToDate() (bool, error) {
 		return false, err
 	}
 
-	return currentCommit == storedCommit, nil
+	if currentCommit != storedCommit {
+		return false, nil
+	}
+
+	dirty, err := isDevcontainerDirty(workspaceRoot)
+	if err != nil {
+		return false, err
+	}
+	if dirty {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func isDevcontainerDirty(workspaceRoot string) (bool, error) {
+	cmd := exec.Command("git", "status", "--porcelain", ".")
+	cmd.Dir = workspaceRoot + "/" + devcontainerPath
+	output, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check git status: %w", err)
+	}
+	return strings.TrimSpace(string(output)) != "", nil
 }
 
 func RebuildDevcontainer() error {

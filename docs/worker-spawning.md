@@ -31,9 +31,10 @@ handles tab creation, prompt injection, and identity assignment.
    - User-provided prompt (the actual task instructions)
    - yx task tracker instructions (how to use `yx ls`, report status, etc.)
 
-3. **Temp file setup** — The assembled prompt is written to a temp file.
-   A wrapper script (`run.sh`) is generated that reads the prompt and
-   execs opencode.
+3. **Persistent script setup** — The assembled prompt and wrapper scripts
+   are written to `.yak-boxes/@home/<worker-name>/scripts/`. This includes
+   `prompt.txt`, `run.sh`, and `layout.kdl`. These persist between worker
+   spawns for debugging and inspection.
 
 4. **Zellij tab creation** — A temporary KDL layout is generated defining
    the worker tab (opencode pane + shell pane). The tab is created via

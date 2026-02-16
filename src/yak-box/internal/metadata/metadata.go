@@ -67,7 +67,7 @@ func SaveMetadata(worker *types.Worker, persona *types.Persona, tasks []string) 
 		CWD:               worker.CWD,
 		SpawnedAt:         worker.SpawnedAt,
 		YakPath:           worker.YakPath,
-		ZellijSessionName: os.Getenv("ZELLIJ_SESSION_NAME"),
+		ZellijSessionName: worker.SessionName,
 		Tasks:             tasks,
 	}
 

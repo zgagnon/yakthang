@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	stopName     string
-	stopTimeout  string
-	stopForce    bool
-	stopDryRun   bool
+	stopName    string
+	stopTimeout string
+	stopForce   bool
+	stopDryRun  bool
 )
 
 var stopCmd = &cobra.Command{
@@ -97,10 +97,16 @@ func runStop() error {
 	if meta.Runtime == "sandboxed" {
 		if stopDryRun {
 			fmt.Printf("[dry-run] Would stop container: %s\n", meta.ContainerName)
+			fmt.Printf("[dry-run] Would close Zellij tab: %s\n", meta.DisplayName)
 		} else {
 			fmt.Println("Stopping container...")
 			if err := runtime.StopSandboxedWorker(stopName, timeout); err != nil {
 				fmt.Printf("Warning: %v\n", err)
+			}
+			// Also close the Zellij tab (container runs inside the tab)
+			fmt.Println("Closing Zellij tab...")
+			if err := runtime.StopNativeWorker(meta.DisplayName, meta.ZellijSessionName); err != nil {
+				fmt.Printf("Warning: failed to close tab: %v\n", err)
 			}
 		}
 	} else if meta.Runtime == "native" {
@@ -108,7 +114,7 @@ func runStop() error {
 			fmt.Printf("[dry-run] Would close Zellij tab: %s\n", meta.DisplayName)
 		} else {
 			fmt.Println("Closing Zellij tab...")
-			if err := runtime.StopNativeWorker(stopName); err != nil {
+			if err := runtime.StopNativeWorker(meta.DisplayName, meta.ZellijSessionName); err != nil {
 				fmt.Printf("Warning: %v\n", err)
 			}
 		}

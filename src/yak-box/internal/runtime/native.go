@@ -73,23 +73,39 @@ func StopNativeWorker(name, sessionName string) error {
 	root, _ := findWorkspaceRoot()
 	closeTabScript := filepath.Join(root, "close-zellij-tab.sh")
 
-	zellijSession := sessionName
-
-	var cmd *exec.Cmd
-	if zellijSession != "" && fileExists(closeTabScript) {
-		cmd = exec.Command(closeTabScript, "--session", zellijSession, name)
-	} else if fileExists(closeTabScript) {
-		cmd = exec.Command(closeTabScript, name)
-	} else {
-		if zellijSession != "" {
-			cmd = exec.Command("zellij", "--session", zellijSession, "action", "close-tab", "-n", name)
+	// Prefer the script if available (handles edge cases)
+	if fileExists(closeTabScript) {
+		var cmd *exec.Cmd
+		if sessionName != "" {
+			cmd = exec.Command(closeTabScript, "--session", sessionName, name)
 		} else {
-			cmd = exec.Command("zellij", "action", "close-tab", "-n", name)
+			cmd = exec.Command(closeTabScript, name)
 		}
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to close zellij tab via script: %w", err)
+		}
+		return nil
 	}
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to close zellij tab: %w", err)
+	// Fallback: use two-step close (go-to-tab-name + close-tab)
+	// Note: zellij close-tab doesn't have a -n flag, must navigate first
+	var goToCmd, closeCmd *exec.Cmd
+	if sessionName != "" {
+		goToCmd = exec.Command("zellij", "--session", sessionName, "action", "go-to-tab-name", name)
+		closeCmd = exec.Command("zellij", "--session", sessionName, "action", "close-tab")
+	} else {
+		goToCmd = exec.Command("zellij", "action", "go-to-tab-name", name)
+		closeCmd = exec.Command("zellij", "action", "close-tab")
+	}
+
+	// Navigate to the tab
+	if err := goToCmd.Run(); err != nil {
+		return fmt.Errorf("failed to navigate to tab '%s': %w", name, err)
+	}
+
+	// Close the current (now focused) tab
+	if err := closeCmd.Run(); err != nil {
+		return fmt.Errorf("failed to close tab: %w", err)
 	}
 
 	return nil

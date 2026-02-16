@@ -21,7 +21,7 @@ adds container isolation around the opencode process.
 
 Docker mode is **not** headless. The flow is:
 
-1. `spawn-worker.sh` writes the prompt to a temp file
+1. `yak-box spawn` writes the prompt to a temp file
 2. It generates a wrapper script that runs `docker run -it` with the prompt
 3. It creates a Zellij tab layout that runs the wrapper as a `command` pane
 4. The container runs opencode interactively — the TUI renders in the pane
@@ -31,14 +31,14 @@ TUI. The Zellij command pane provides the terminal that Docker bridges into.
 
 ## Runtime Detection
 
-spawn-worker.sh auto-detects the runtime (Docker first, then Zellij):
+yak-box spawn auto-detects the runtime (Docker first, then Zellij):
 
 ```bash
 # Force Docker mode
-RUNTIME=docker ./spawn-worker.sh --cwd . --name test --task test/foo "Do the thing"
+./bin/yak-box spawn --runtime docker --cwd . --name test --yaks test/foo "Do the thing"
 
-# Force Zellij mode
-RUNTIME=zellij ./spawn-worker.sh --cwd . --name test --task test/foo "Do the thing"
+# Force Zellij mode  
+./bin/yak-box spawn --runtime zellij --cwd . --name test --yaks test/foo "Do the thing"
 ```
 
 ## Building the Worker Image
@@ -100,14 +100,14 @@ This was the root cause of the "blank pane" bug during Docker worker development
 ## Authentication
 
 Workers receive `OPENCODE_API_KEY` as an environment variable. The key must
-be set in the spawning user's environment before running spawn-worker.sh.
+be set in the spawning user's environment before running yak-box spawn.
 
 ```bash
 # In ~/.profile or ~/.bashrc (before the interactive guard)
 export OPENCODE_API_KEY="sk-open-..."
 ```
 
-spawn-worker.sh will refuse to start a Docker worker if the key is not set.
+yak-box spawn will refuse to start a Docker worker if the key is not set.
 
 The container does NOT mount the host's `$HOME` or opencode auth.json.
 Each container has its own isolated home directory on tmpfs.
@@ -117,8 +117,8 @@ Each container has its own isolated home directory on tmpfs.
 ### E2E smoke test
 
 ```bash
-RUNTIME=docker ./spawn-worker.sh --cwd . --name test-docker \
-  --task test/docker-yak "Say hello and report done via yx"
+./bin/yak-box spawn --runtime docker --cwd . --name test-docker \
+  --yaks test/docker-yak "Say hello and report done via yx"
 
 # Check the worker tab — TUI should render with the opencode interface
 # Check task status
@@ -148,7 +148,7 @@ docker inspect yak-worker-test-docker --format '
 
 ### "OPENCODE_API_KEY not set" error
 
-**Cause**: Key not in environment. spawn-worker.sh checks before launching.
+**Cause**: Key not in environment. yak-box spawn checks before launching.
 
 **Fix**: Export the key in your shell profile and source it.
 
@@ -172,6 +172,6 @@ docker inspect yak-worker-test-docker --format '
 
 ## Related Docs
 
-- [Worker Spawning](../worker-spawning.md) — spawn-worker.sh design
+- [Worker Spawning](../worker-spawning.md) — yak-box spawn design
 - [Security](../deployment/SECURITY.md) — full security model
 - [Troubleshooting](../deployment/TROUBLESHOOTING.md) — general issues

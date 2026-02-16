@@ -9,7 +9,7 @@ areas are limited to explicit tmpfs mounts and bind-mounted volumes.
 
 ## Container Security Flags
 
-All of these are applied by spawn-worker.sh and verified working with opencode:
+All of these are applied by yak-box spawn and verified working with opencode:
 
 | Flag | Purpose |
 |------|---------|
@@ -73,7 +73,7 @@ Workers receive `OPENCODE_API_KEY` as an environment variable passed via
 - NOT persisted (container is ephemeral, tmpfs is volatile)
 - Sourced from the spawning user's environment
 
-spawn-worker.sh will exit with an error if the key is not set.
+yak-box spawn will exit with an error if the key is not set.
 
 ## Non-root Execution
 
@@ -91,7 +91,7 @@ Containers run as the host user via `--user $(id -u):$(id -g)`. This means:
 **Problem**: `--setup-network` flag not working or network still blocked
 
 **Solution**:
-1. Verify flag is passed: `./spawn-worker.sh --setup-network ...`
+1. Verify flag is passed: `./bin/yak-box spawn --setup-network ...`
 2. Check Docker daemon is running: `docker ps`
 3. Verify container network mode: `docker inspect <container> | grep NetworkMode`
 4. Check Docker network configuration: `docker network ls`
@@ -174,11 +174,11 @@ The Yak orchestration system uses a three-layer security model to manage credent
 
 **Credentials**: Inherited from yakob via `-e` flag
 
-**Management**: Automatic via spawn-worker.sh
+**Management**: Automatic via yak-box spawn
 
 **Purpose**: Workers use API key for OpenCode operations
 
-**Implementation**: spawn-worker.sh passes `-e OPENCODE_API_KEY="${OPENCODE_API_KEY:-}"` (line 265)
+**Implementation**: yak-box spawn passes `-e OPENCODE_API_KEY="${OPENCODE_API_KEY:-}"`
 
 **Security Properties**:
 - API key not baked into Docker image
@@ -276,7 +276,7 @@ sudo chmod 600 /etc/yak-creds/*
 **Usage**:
 - Mount as read-only volume: `-v /etc/yak-creds:/creds:ro`
 - Workers read from `/creds/opencode-api-key`
-- Requires code changes to spawn-worker.sh
+- Requires code changes to yak-box
 
 **Current Status**: Not implemented (environment variable approach sufficient)
 
@@ -323,8 +323,8 @@ sudo chmod 600 /etc/yak-creds/*
    # Check orchestrator has key
    sudo systemctl show openclaw-gateway | grep OPENCODE_API_KEY
    
-   # Spawn test worker and check logs
-   sudo -u yakob ./spawn-worker.sh --name "test" "echo 'API key present'"
+# Spawn test worker and check logs
+    sudo -u yakob ./bin/yak-box spawn --name "test" "echo 'API key present'"
    docker logs <container-id> 2>&1 | grep -i "api"
    ```
 
@@ -339,7 +339,7 @@ sudo chmod 600 /etc/yak-creds/*
 - [ ] API key in systemd service: `sudo systemctl show openclaw-gateway | grep OPENCODE`
 - [ ] Service starts successfully: `sudo systemctl status openclaw-gateway`
 - [ ] Workers inherit key: Check container environment with `docker inspect`
-- [ ] Orchestrator can spawn workers: `./spawn-worker.sh --name "test" "echo hello"`
+- [ ] Orchestrator can spawn workers: `./bin/yak-box spawn --name "test" "echo hello"`
 - [ ] Service file permissions: `ls -l /etc/systemd/system/openclaw-gateway.service.d/`
 
 ## Security Best Practices
@@ -397,7 +397,7 @@ sudo chmod 600 /etc/yak-creds/*
 
 ### Container Security
 
-- **Workers run as non-root** (enforced by spawn-worker.sh)
+- **Workers run as non-root** (enforced by yak-box spawn)
   - `--user $(id -u):$(id -g)` flag
   - Prevents privilege escalation
   - Limits damage from container breakout
@@ -439,7 +439,7 @@ docker inspect <container-id> | grep OPENCODE
 1. Verify key is set in systemd service: `sudo systemctl edit openclaw-gateway`
 2. Restart service: `sudo systemctl restart openclaw-gateway`
 3. Check service status: `sudo systemctl status openclaw-gateway`
-4. Verify spawn-worker.sh passes `-e OPENCODE_API_KEY` (line 265)
+4. Verify yak-box spawn passes `-e OPENCODE_API_KEY`
 
 ### Permission Denied
 

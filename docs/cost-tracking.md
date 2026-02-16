@@ -35,7 +35,7 @@ The job is extraction, not implementation.
 │  └─ Control UI (:18789)         │  Dashboard
 └─────────────────────────────────┘
           │
-          │ spawns via spawn-worker.sh
+          │ spawns via yak-box spawn
           ▼
 ┌─────────────────────────────────┐
 │  OpenCode Workers (Docker)      │  Ephemeral containers
@@ -56,7 +56,7 @@ The job is extraction, not implementation.
 
 ## Components
 
-### 1. spawn-worker.sh (Exit Hook)
+### 1. yak-box spawn (Exit Hook)
 
 Modified the inner script template to capture cost data before container exit.
 
@@ -120,7 +120,7 @@ Models:
   claude-sonnet-4-5:   $16.96 (100.0%)
 ```
 
-### 4. check-workers.sh (Live Cost)
+### 4. yak-box check (Live Cost)
 
 Added live cost display for running Docker workers.
 
@@ -146,7 +146,7 @@ date,openclaw_cost,opencode_cost,total_cost,sessions,workers
 Updated the daily summary cron job to include cost data:
 
 ```
-openclaw cron edit <JOB_ID> --message "... Run yx ls, check-workers.sh, and ./cost-summary.sh --today first."
+openclaw cron edit <JOB_ID> --message "... Run yx ls, yak-box check, and ./cost-summary.sh --today first."
 ```
 
 ## Design Decisions
@@ -175,10 +175,10 @@ All data kept indefinitely. No pruning — storage is cheap, data is valuable.
 
 | File | Purpose |
 |------|---------|
-| `spawn-worker.sh` | Worker spawner with exit hook |
+| `bin/yak-box` | Worker spawner with exit hook |
 | `cost-openclaw.sh` | OpenClaw cost extractor |
 | `cost-summary.sh` | Unified cost reporter |
-| `check-workers.sh` | Worker status + live cost |
+| `bin/yak-box check` | Worker status + live cost |
 | `.worker-costs/` | Persistent cost data storage |
 | `.worker-costs/daily-totals.csv` | Historical totals |
 
@@ -188,7 +188,7 @@ All data kept indefinitely. No pruning — storage is cheap, data is valuable.
 
 The 17:00 UTC cron job now runs:
 1. `yx ls` — Task status
-2. `check-workers.sh` — Worker status + live costs
+2. `yak-box check` — Worker status + live costs
 3. `./cost-summary.sh --today` — Cost summary
 4. Posts combined summary to Slack
 

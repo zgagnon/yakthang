@@ -39,13 +39,13 @@ OpenCode supports two types of custom agents:
 **CLAUDE.md structure:**
 - Yakob personality (calm shepherd of workers, dry yak puns)
 - Core role: PLANNER and COORDINATOR, not implementer
-- Architecture documentation (yx, spawn-worker.sh, .yaks/)
+- Architecture documentation (yx, yak-box spawn, .yaks/)
 - Task management workflows
 - Worker spawning patterns
 - Monitoring and feedback protocols
 - 7 core rules
 
-**spawn-worker.sh mechanics:**
+**yak-box spawn mechanics:**
 - Takes --mode flag (plan or build)
 - Maps to: `opencode --prompt "$PROMPT" --agent ${MODE}`
 - Injects random worker personality inline (Yakriel, Yakueline, Yakov, Yakira)
@@ -77,19 +77,18 @@ Create a custom primary agent named "yakob" that the user explicitly selects whe
 # ~/.config/opencode/agents/yakob.md
 
 ---
-description: Orchestrates multi-agent workspaces via yx and spawn-worker.sh. Plans work, spawns workers, monitors progress. Never implements directly.
+description: Orchestrates multi-agent workspaces via yx and yak-box. Plans work, spawns workers, monitors progress. Never implements directly.
 mode: primary
 temperature: 0.3
 tools:
   write: false    # Orchestrators don't write code
   edit: false     # Orchestrators don't edit code
-  bash: true      # Needed for yx commands and spawn-worker.sh
+  bash: true      # Needed for yx commands and yak-box
 permission:
   bash:
     "*": "ask"
     "yx *": "allow"
-    "spawn-worker.sh *": "allow"
-    "check-workers.sh *": "allow"
+    "bin/yak-box *": "allow"
     "git status": "allow"
     "git add *": "allow"
     "git commit *": "allow"
@@ -172,8 +171,8 @@ Yakob as a primary agent + minimal project CLAUDE.md with orchestrator-specific 
 This workspace uses the Yakob orchestrator agent. Key locations:
 
 - Task state: `.yaks/`
-- Worker spawner: `spawn-worker.sh`
-- Worker monitor: `check-workers.sh`
+- Worker spawner: `bin/yak-box spawn`
+- Worker monitor: `bin/yak-box check`
 - Layout: `orchestrator.kdl`
 
 See ~/.config/opencode/agents/yakob.md for core orchestration instructions.
@@ -208,7 +207,7 @@ See ~/.config/opencode/agents/yakob.md for core orchestration instructions.
 1. Frontmatter (mode, tools, permissions, temperature, color)
 2. Yakob personality (shepherd, yak puns, calm methodical)
 3. Role definition (PLANNER and COORDINATOR, not implementer)
-4. Architecture documentation (yx, spawn-worker.sh, .yaks/)
+4. Architecture documentation (yx, yak-box, .yaks/)
 5. Task management workflows (lifecycle, writing context)
 6. Spawning workers (scoping, plan vs build modes)
 7. Monitoring & feedback protocols
@@ -228,8 +227,7 @@ permission:
   bash:
     "*": "ask"
     "yx *": "allow"
-    "spawn-worker.sh *": "allow"
-    "check-workers.sh *": "allow"
+    "bin/yak-box *": "allow"
     "git status": "allow"
     "git add *": "allow"
     "git commit *": "allow"
@@ -248,7 +246,7 @@ pane size="67%" name="Yakob" focus=true {
 
 ### Phase 3: Update Worker Spawning (No Changes Needed!)
 
-**Key insight:** spawn-worker.sh already uses `--agent ${MODE}` where MODE is "plan" or "build". These are OpenCode's built-in agents. No changes needed!
+**Key insight:** yak-box already uses `--mode ${MODE}` where MODE is "plan" or "build". These map to OpenCode's built-in agents. No changes needed!
 
 The architecture already separates orchestrator from workers:
 - Orchestrator: `opencode --agent yakob`
@@ -277,7 +275,7 @@ The architecture already separates orchestrator from workers:
 1. Launch orchestrator: `zellij --layout orchestrator.kdl`
 2. Verify Yakob agent loads correctly
 3. Test yx commands work (should be allowed)
-4. Test spawn-worker.sh (should prompt for approval, then allow)
+4. Test yak-box spawn (should prompt for approval, then allow)
 5. Verify workers spawn correctly with plan/build agents
 6. Test git operations (should be allowed for status/commit)
 7. Verify file editing is blocked (try to write a file, should fail)
@@ -291,7 +289,7 @@ Update these files:
 
 ## Worker Personalities
 
-**Current approach:** spawn-worker.sh randomly assigns personalities (Yakriel, Yakueline, Yakov, Yakira) inline.
+**Current approach:** yak-box spawn randomly assigns personalities (Yakriel, Yakueline, Yakov, Yakira) inline.
 
 **Recommendation:** KEEP THIS AS-IS.
 
@@ -304,7 +302,7 @@ Update these files:
 **Alternative (not recommended):** Create 4 subagent definitions for each worker personality. This would:
 - Add complexity
 - Violate the "keep sub-repos clean" principle
-- Make spawn-worker.sh more complex
+- Make yak-box more complex
 - Provide minimal benefit
 
 ## Project-Specific Context
@@ -444,7 +442,7 @@ The test suite requires Docker. Remind workers to start services via:
 4. **Switching agents:** Should users be able to switch to build/plan from Yakob?
    - **Recommendation:** Yes, keep flexibility
 
-5. **Mode flag:** Should spawn-worker.sh --mode plan/build stay as-is?
+5. **Mode flag:** Should yak-box spawn --mode plan/build stay as-is?
    - **Recommendation:** Yes, it already uses OpenCode's built-in agents
 
 6. **Permission granularity:** Are the bash permissions too restrictive or too permissive?

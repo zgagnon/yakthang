@@ -213,7 +213,7 @@ docker kill <container-id>
 From within the orchestrator session:
 
 ```bash
-./spawn-worker.sh --cwd ./project --name "my-worker" "Work on task X"
+./bin/yak-box spawn --cwd ./project --name "my-worker" "Work on task X"
 ```
 
 ### Checking Task Status
@@ -288,9 +288,9 @@ docker ps
 # Check worker image exists
 docker images | grep yak-worker
 
-# Check spawn-worker.sh permissions
-ls -l spawn-worker.sh
-chmod +x spawn-worker.sh
+# Check yak-box permissions
+ls -l ./bin/yak-box
+chmod +x ./bin/yak-box
 
 # Check Docker daemon logs
 sudo journalctl -u docker -n 50

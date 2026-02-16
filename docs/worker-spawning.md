@@ -3,13 +3,13 @@
 ## Overview
 
 Workers are disposable opencode instances that execute tasks in isolated
-Zellij tabs. The orchestrator spawns them via `spawn-worker.sh`, which
+Zellij tabs. The orchestrator spawns them via `yak-box spawn`, which
 handles tab creation, prompt injection, and identity assignment.
 
 ## Usage
 
 ```bash
-./spawn-worker.sh --cwd <dir> --name <tab-name> [--mode plan|build] "<prompt>"
+./bin/yak-box spawn --cwd <dir> --name <tab-name> [--mode plan|build] "<prompt>"
 ```
 
 | Option | Required | Default | Description |
@@ -99,14 +99,14 @@ their system prompt. This means:
 
 ```bash
 # Simple build worker in a sub-repo
-./spawn-worker.sh --cwd ./api --name "api-auth" \
+./bin/yak-box spawn --cwd ./api --name "api-auth" \
   "Work on auth/api/* tasks."
 
 # Plan worker for complex task
-./spawn-worker.sh --mode plan --cwd ./api --name "api-planner" \
+./bin/yak-box spawn --mode plan --cwd ./api --name "api-planner" \
   "Plan the auth refactor. Analyze the codebase and write a plan."
 
 # Worker with custom yak-path (if .yaks is elsewhere)
-./spawn-worker.sh --cwd ./api --name "api-auth" --yak-path /path/to/.yaks \
+./bin/yak-box spawn --cwd ./api --name "api-auth" --yak-path /path/to/.yaks \
   "Work on auth/api/* tasks."
 ```

@@ -32,8 +32,9 @@ yak-box spawn --cwd <dir> --name <tab-name> [flags] "<prompt>"
 |------|----------|---------|-------------|
 | `--cwd` | Yes | — | Working directory for the worker |
 | `--name` | Yes | — | Worker name (used in logs, metadata) |
+| `--session` | No | `yakthang` | Zellij session name (overrides ZELLIJ_SESSION_NAME env var) |
 | `--mode` | No | `build` | Agent mode: `plan` or `build` |
-| `--resources` | No | `default` | Resource profile: `light`, `default`, `heavy` |
+| `--resources` | No | `default` | Resource profile: `light`, `default`, `heavy`, `ram` |
 | `--yaks` | No | [] | Yack paths from .yaks/ to assign (can repeat) |
 | `--yak-path` | No | `.yaks` | Path to task state directory |
 | `--runtime` | No | `auto` | Runtime: `auto`, `sandboxed`, `native` |
@@ -149,6 +150,7 @@ type Worker struct {
     YakPath       string
     Tasks         []string
     SpawnedAt     time.Time
+    SessionName   string // Zellij session name (overrides ZELLIJ_SESSION_NAME)
 }
 ```
 

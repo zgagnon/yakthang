@@ -53,7 +53,7 @@ where the orchestrator needs frequent progress updates.
 
 ## Assignment
 
-Personalities are assigned randomly at spawn time in `spawn-worker.sh`:
+Personalities are assigned randomly at spawn time in `yak-box spawn` (see `bin/yak-box`):
 
 ```bash
 SHAVER_INDEX=$((RANDOM % ${#WORKER_NAMES[@]}))

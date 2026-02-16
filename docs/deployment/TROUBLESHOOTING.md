@@ -77,7 +77,7 @@ sudo systemctl restart openclaw-gateway
 
 ### Workers won't spawn
 
-**Symptom**: `spawn-worker.sh` exits with errors.
+**Symptom**: `yak-box spawn` exits with errors.
 
 **Cause**: Docker not running, image missing, or permission issues.
 
@@ -93,8 +93,8 @@ docker images | grep yak-worker
 cd /home/yakob/workspace
 docker build -f worker.Dockerfile -t yak-worker:latest .
 
-# Check spawn-worker.sh executable
-chmod +x spawn-worker.sh
+# Check yak-box executable
+chmod +x ./bin/yak-box
 ```
 
 ### Workers spawn but TUI is blank (no output in pane)
@@ -148,7 +148,7 @@ Common errors:
 
 **Cause**: UID mismatch between host and container.
 
-**Solution**: Verify spawn-worker.sh uses `--user $(id -u):$(id -g)` and
+**Solution**: Verify yak-box spawn uses `--user $(id -u):$(id -g)` and
 that the .yaks directory is writable by that user on the host.
 
 ## Network Issues
@@ -193,15 +193,15 @@ sudo systemctl reload sshd
 
 **Symptom**: `docker inspect` shows capabilities not dropped.
 
-**Cause**: spawn-worker.sh missing --cap-drop ALL.
+**Cause**: yak-box missing --cap-drop ALL.
 
 **Solution**:
 ```bash
-# Verify flag present
-grep "cap-drop" spawn-worker.sh
+# Verify flag present in yak-box source
+grep "cap-drop" src/yakbox/
 
 # Test with new worker
-RUNTIME=docker ./spawn-worker.sh --cwd . --name test "echo test"
+./bin/yak-box spawn --cwd . --name test "echo test"
 docker inspect yak-worker-test --format '{{.HostConfig.CapDrop}}'
 # Should show: [ALL]
 ```
@@ -216,7 +216,7 @@ docker inspect yak-worker-test --format '{{.HostConfig.CapDrop}}'
 
 **Solution**: Use heavy resource profile:
 ```bash
-./spawn-worker.sh --resources heavy --cwd . --name heavy-task "..."
+./bin/yak-box spawn --resources heavy --cwd . --name heavy-task "..."
 ```
 
 ### Too many workers running
@@ -226,10 +226,10 @@ docker inspect yak-worker-test --format '{{.HostConfig.CapDrop}}'
 **Solution**: Check and cleanup:
 ```bash
 # Check running workers
-./check-workers.sh
+./bin/yak-box check
 
 # Kill specific worker
-./kill-worker.sh <worker-name>
+./bin/yak-box stop --force <worker-name>
 
 # Cleanup stopped containers
 ./cleanup-workers.sh

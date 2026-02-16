@@ -78,9 +78,9 @@ sudo systemctl enable --now openclaw-gateway
 ```bash
 su - yakob
 openclaw cron add --name 'Worker sweep' --cron '0 */2 * * *' --tz UTC \
-  --session main --system-event 'Check for blocked workers and stale tasks. Run check-workers.sh.' --wake now
+  --session main --system-event 'Check for blocked workers and stale tasks. Run yak-box check.' --wake now
 openclaw cron add --name 'Daily summary' --cron '0 17 * * *' --tz UTC \
-  --session isolated --message 'Summarize today. Run yx ls, check-workers.sh, ./cost-summary.sh --today.' --announce
+  --session isolated --message 'Summarize today. Run yx ls, yak-box check, ./cost-summary.sh --today.' --announce
 ```
 
 ## Verification Checklist

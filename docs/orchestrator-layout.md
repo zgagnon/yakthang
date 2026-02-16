@@ -39,12 +39,12 @@ and spawns workers — but never edits application code directly.
 
 ### Shell pane (right bottom, ~20% of 67%)
 
-A plain shell for manual commands: running `check-workers.sh`, reading fields,
+A plain shell for manual commands: running `yak-box check`, reading fields,
 git operations, or anything the orchestrator needs outside of opencode.
 
 ## Worker Tabs
 
-Worker tabs are created dynamically by `spawn-worker.sh` (see
+Worker tabs are created dynamically by `yak-box spawn` (see
 [worker-spawning.md](worker-spawning.md)). Each worker tab has:
 
 ```
@@ -82,8 +82,7 @@ tab. Everything else is spawned from there.
 - **Watch for the yak-map**: A simple `watch` loop over `yx ls` is sufficient
   for live task state. No custom daemon needed.
 - **Opencode for both orchestrator and workers**: The orchestrator runs
-  interactive opencode; workers run `opencode run` in headless mode (via
-  `spawn-worker.sh`).
+  interactive opencode; workers run via `yak-box spawn`.
 - **Focus returns to orchestrator**: After spawning a worker tab,
-  `spawn-worker.sh` calls `zellij action go-to-previous-tab` so the
+  `yak-box spawn` calls `zellij action go-to-previous-tab` so the
   orchestrator doesn't lose its place.

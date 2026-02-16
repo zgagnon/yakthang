@@ -3,13 +3,13 @@
 ## Overview
 
 Workers operate in one of two modes, controlled by the `--mode` flag on
-`spawn-worker.sh`. This enables a two-phase workflow where complex tasks
+`yak-box spawn`. This enables a two-phase workflow where complex tasks
 are planned before implementation begins.
 
 ## Build Mode (default)
 
 ```bash
-./spawn-worker.sh --cwd ./api --name "auth-builder" "Work on auth/* tasks."
+./bin/yak-box spawn --cwd ./api --name "auth-builder" "Work on auth/* tasks."
 ```
 
 - Uses opencode's `build` agent (full file editing permissions)
@@ -28,7 +28,7 @@ are planned before implementation begins.
 ## Plan Mode
 
 ```bash
-./spawn-worker.sh --mode plan --cwd ./api --name "auth-planner" \
+./bin/yak-box spawn --mode plan --cwd ./api --name "auth-planner" \
   "Plan the auth refactor."
 ```
 
@@ -66,7 +66,7 @@ Phase 2: Build
 ```
 
 The handoff between phases uses the existing `blocked:` status protocol.
-The orchestrator sees `blocked: plan ready for review` in `check-workers.sh`,
+The orchestrator sees `blocked: plan ready for review` in `yak-box check`,
 the human reviews, and then a build worker is spawned with a reference to
 the plan.
 

@@ -80,7 +80,7 @@ Workers use the standard `plan` and `build` agents with personalities injected v
 - **Yakov** 🦬🔔 - Cautious and thorough
 - **Yakira** 🦬🧶 - Cheerful and communicative
 
-Worker personalities are loaded from `.opencode/personalities/` and injected into the prompt by `spawn-worker.sh`.
+Worker personalities are loaded from `.opencode/personalities/` and injected into the prompt by `yak-box spawn`.
 
 ## Implementation Notes
 

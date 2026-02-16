@@ -44,23 +44,23 @@ echo "done: JWT auth implemented with expiry check" | yx field auth/api agent-st
 
 ## Checking Status
 
-### check-workers.sh
+### yak-box check
 
 The primary monitoring tool. Scans `.yaks/` for `agent-status` fields and
 displays them in a table.
 
 ```bash
 # All statuses
-./check-workers.sh
+./bin/yak-box check
 
 # Only blocked workers (needs immediate attention)
-./check-workers.sh --blocked
+./bin/yak-box check --blocked
 
 # Only in-progress workers
-./check-workers.sh --wip
+./bin/yak-box check --wip
 
 # Scoped to a task subtree
-./check-workers.sh auth/
+./bin/yak-box check --prefix auth
 ```
 
 Output format:

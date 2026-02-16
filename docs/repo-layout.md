@@ -35,11 +35,9 @@ Docker worker containers mount the entire `yakthang/` directory. Workers see eve
 
 ## Migration Notes
 
-Current top-level scripts (`spawn-worker.sh`, `check-workers.sh`, `shutdown-worker.sh`, etc.) and config files (`orchestrator.kdl`, `worker.Dockerfile`, etc.) need to find appropriate homes:
+Old top-level scripts (`spawn-worker.sh`, `check-workers.sh`, `shutdown-worker.sh`, `kill-worker.sh`, `yak-map.sh`) have been replaced by `bin/yak-box`. 
 
-- Orchestration scripts → `src/yakbox/` or a dedicated `scripts/` dir
-- `worker.Dockerfile` → `src/yakbox/`
-- `orchestrator.kdl` → root (Zellij layout) or `docs/`
+Config files (`orchestrator.kdl`, `worker.Dockerfile`, etc.) are at:
+- `orchestrator.kdl` → root
+- `worker.Dockerfile` → TBD
 - `themes/` → TBD
-
-These decisions can be made during implementation.

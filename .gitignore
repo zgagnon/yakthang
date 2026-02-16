@@ -21,3 +21,7 @@ bin/yak-map.wasm
 /.openclaw/workspace/.yaks
 
 .opencode/plans/
+
+# OpenClaw runtime state
+/.openclaw/workspace/.clawhub/
+/.openclaw/workspace/.openclaw/

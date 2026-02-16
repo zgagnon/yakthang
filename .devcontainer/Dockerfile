@@ -32,23 +32,19 @@ ENV GO111MODULE=on
 # Install gopls (Go language server for LSP)
 RUN go install golang.org/x/tools/gopls@latest
 
+# Create yakshaver user before installing Rust so it goes into ~yakshaver
+RUN useradd -m -s /bin/bash yakshaver
+
+# Install Rust as yakshaver — defaults to ~/.rustup and ~/.cargo
+# which live under /home/yakshaver/ and get re-chowned by updateRemoteUserUID
+USER yakshaver
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    RUSTUP_HOME=/opt/rustup \
-    CARGO_HOME=/opt/cargo \
-    sh -s -- -y --default-toolchain stable --no-modify-path
+    sh -s -- -y --default-toolchain stable --no-modify-path && \
+    . ~/.cargo/env && \
+    rustup target add wasm32-wasip1
+USER root
 
-RUN useradd -m -s /bin/bash yakshaver && \
-    chown -R yakshaver:yakshaver /opt/cargo /opt/rustup
-
-RUN echo 'export RUSTUP_HOME=/opt/rustup' >> /home/yakshaver/.bashrc && \
-    echo 'export CARGO_HOME=/opt/cargo' >> /home/yakshaver/.bashrc && \
-    echo 'export PATH=/opt/cargo/bin:$PATH' >> /home/yakshaver/.bashrc
-
-ENV PATH="/opt/cargo/bin:${PATH}"
-ENV RUSTUP_HOME=/opt/rustup
-ENV CARGO_HOME=/opt/cargo
-
-RUN sudo -u yakshaver env RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH rustup target add wasm32-wasip1
+ENV PATH="/home/yakshaver/.cargo/bin:${PATH}"
 
 # Install OpenCode CLI
 RUN curl -fsSL https://opencode.ai/install | bash && \

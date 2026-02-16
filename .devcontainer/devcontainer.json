@@ -6,7 +6,7 @@
   },
   "features": {},
   "workspaceFolder": "/workspace",
-  "remoteUser": "root",
+  "remoteUser": "yakshaver",
   "postCreateCommand": "git config --global --add safe.directory '*'",
   "customizations": {
     "vscode": {

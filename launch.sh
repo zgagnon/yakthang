@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-zellij --layout orchestrator.kdl
+if zellij list-sessions 2>/dev/null | grep -q "yakthang"; then
+	zellij attach yakthang --force-run-commands
+else
+	zellij -s yakthang -n orchestrator.kdl
+fi

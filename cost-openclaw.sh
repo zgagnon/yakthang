@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# cost-openclaw.sh - Extract cost data from OpenClaw Gateway
-# Parses JSONL transcripts to compute cost by session type
+# cost-openclaw.sh - Extract cost data from OpenClaw Gateway (PERFORMANT VERSION)
+# Parses JSONL transcripts efficiently using single jq queries per file
 
 OPENCLAW_SESSIONS="${HOME}/.openclaw/agents/main/sessions"
 DAYS="${1:-1}"
 
-# Pricing model (approximate - used when cost not in transcript)
+# Pricing model (per 1M tokens) - used when cost not in transcript
 declare -A PRICING=(
     [claude-opus-4-5]="15.00 75.00 0.60 0.30"
     [claude-opus-4-6]="15.00 75.00 0.60 0.30"
@@ -33,108 +33,111 @@ case "${1:-}" in
     --month) DAYS=30 ;;
     --all) DAYS=3650 ;;
     -h|--help) usage ;;
+    ''|[0-9]*) ;;  # Accept empty or numeric as days
+    *) usage ;;
 esac
 
 # Calculate cutoff timestamp
-CUTOFF=$(date -d "${DAYS} days ago" +%s)
+CUTOFF=$(date -d "${DAYS} days ago" +%s 2>/dev/null || date -v-${DAYS}d +%s)
 
 # Session type classification
 classify_session() {
     local key="$1"
-    if [[ "$key" == *"cron"* ]]; then
-        echo "cron"
-    elif [[ "$key" == *"slack"* ]]; then
-        echo "slack"
-    elif [[ "$key" == *"heartbeat"* ]]; then
-        echo "heartbeat"
-    else
-        echo "interactive"
-    fi
+    case "$key" in
+        *cron*) echo "cron" ;;
+        *slack*) echo "slack" ;;
+        *heartbeat*) echo "heartbeat" ;;
+        *) echo "interactive" ;;
+    esac
 }
 
-# Compute cost from usage if not in transcript
+# Compute cost from usage when not directly available
 compute_cost() {
     local input="$1" output="$2" cache_read="$3" cache_write="$4" model="$5"
     
     if [[ -v "PRICING[$model]" ]]; then
         read -r i o c_r c_w <<< "${PRICING[$model]}"
-        # Prices per 1M tokens
-        input_cost=$(awk "BEGIN {printf \"%.6f\", $input * $i / 1000000}")
-        output_cost=$(awk "BEGIN {printf \"%.6f\", $output * $o / 1000000}")
-        cache_read_cost=$(awk "BEGIN {printf \"%.6f\", $cache_read * $c_r / 1000000}")
-        cache_write_cost=$(awk "BEGIN {printf \"%.6f\", $cache_write * $c_w / 1000000}")
-        total=$(awk "BEGIN {printf \"%.6f\", $input_cost + $output_cost + $cache_read_cost + $cache_write_cost}")
-        echo "$total"
+        awk "BEGIN { 
+            input_c = $input * $i / 1000000;
+            output_c = $output * $o / 1000000;
+            cache_r_c = $cache_read * $c_r / 1000000;
+            cache_w_c = $cache_write * $c_w / 1000000;
+            printf \"%.6f\", input_c + output_c + cache_r_c + cache_w_c
+        }"
     else
         echo "0"
     fi
 }
 
-# Parse sessions.json
-declare -A session_files
-while IFS= read -r key; do
-    session_file=$(jq -r ".[\"$key\"].sessionFile // empty" "${OPENCLAW_SESSIONS}/sessions.json" 2>/dev/null)
-    if [[ -n "$session_file" && -f "$session_file" ]]; then
-        session_files["$key"]="$session_file"
-    fi
-done < <(jq -r 'keys[]' "${OPENCLAW_SESSIONS}/sessions.json" 2>/dev/null)
+# Temp file for accumulating results
+TEMP_RESULTS=$(mktemp)
+trap 'rm -f "$TEMP_RESULTS"' EXIT
 
-# Aggregate costs by session type
+# Process sessions.json to get file mappings
+if [[ ! -f "${OPENCLAW_SESSIONS}/sessions.json" ]]; then
+    echo "No sessions.json found"
+    exit 0
+fi
+
+# Build array of session_key -> session_file, filter by date, extract costs
+while IFS=$'\t' read -r key session_file; do
+    [[ -z "$key" || -z "$session_file" ]] && continue
+    [[ ! -f "$session_file" ]] && continue
+    
+    # Get timestamp from first line
+    first_line=$(head -1 "$session_file" 2>/dev/null)
+    [[ -z "$first_line" ]] && continue
+    
+    session_time=$(echo "$first_line" | jq -r '.timestamp // empty' 2>/dev/null | sed 's/Z//' | sed 's/T/ /')
+    [[ -z "$session_time" ]] && continue
+    
+    session_ts=$(date -d "$session_time" +%s 2>/dev/null || date -jf "%Y-%m-%d %H:%M:%S" "$session_time" +%s 2>/dev/null || continue)
+    [[ "$session_ts" -lt "$CUTOFF" ]] && continue
+    
+    type=$(classify_session "$key")
+    
+    # Extract all assistant message costs in ONE jq query per file
+    # Output format: type|model|cost
+    jq -r --arg type "$type" '
+        . as $root |
+        select($root.message.role == "assistant") |
+        (
+            ($root.message.usage.cost.total // "0") as $cost |
+            ($root.message.model // "unknown") as $model |
+            ($root.message.usage.input // "0") as $input |
+            ($root.message.usage.output // "0") as $output |
+            ($root.message.usage.cacheRead // "0") as $cache_r |
+            ($root.message.usage.cacheWrite // "0") as $cache_w |
+            if $cost == "null" or $cost == "0" then
+                "NEED_COMPUTE|\($type)|\($model)|\($input)|\($output)|\($cache_r)|\($cache_w)"
+            else
+                "DONE|\($type)|\($model)|\($cost)"
+            end
+        )
+    ' "$session_file" 2>/dev/null | while IFS='|' read -r status type model a b c d; do
+        if [[ "$status" == "NEED_COMPUTE" ]]; then
+            cost=$(compute_cost "$a" "$b" "$c" "$d" "$model")
+            echo "$type|$model|$cost" >> "$TEMP_RESULTS"
+        else
+            echo "$type|$model|$a" >> "$TEMP_RESULTS"
+        fi
+    done
+    
+done < <(jq -r 'to_entries[] | [.key, .value.sessionFile] | @tsv' "${OPENCLAW_SESSIONS}/sessions.json" 2>/dev/null)
+
+# Aggregate results from temp file
 declare -A type_costs
-declare -A type_tokens
 declare -A model_costs
 total_cost=0
 
-for key in "${!session_files[@]}"; do
-    session_file="${session_files[$key]}"
-    type=$(classify_session "$key")
+while IFS='|' read -r type model cost; do
+    [[ -z "$type" || -z "$cost" ]] && continue
     
-    # Get session timestamp from first entry
-    session_time=$(head -1 "$session_file" 2>/dev/null | jq -r '.timestamp // empty' | sed 's/Z//' | sed 's/T/ /')
-    if [[ -z "$session_time" ]]; then
-        continue
-    fi
-    
-    session_ts=$(date -d "$session_time" +%s 2>/dev/null || continue)
-    if [[ "$session_ts" -lt "$CUTOFF" ]]; then
-        continue
-    fi
-    
-    # Parse JSONL for usage/cost data
-    while IFS= read -r line; do
-        msg=$(echo "$line" | jq -r '.message // empty' 2>/dev/null)
-        if [[ -z "$msg" || "$msg" == "null" ]]; then
-            continue
-        fi
-        
-        role=$(echo "$msg" | jq -r '.role // empty')
-        if [[ "$role" != "assistant" ]]; then
-            continue
-        fi
-        
-        # Try to get cost directly
-        cost=$(echo "$msg" | jq -r '.usage.cost.total // empty')
-        model=$(echo "$msg" | jq -r '.model // empty')
-        
-        if [[ -z "$cost" || "$cost" == "null" || "$cost" == "0" ]]; then
-            # Compute from usage
-            input=$(echo "$msg" | jq -r '.usage.input // 0')
-            output=$(echo "$msg" | jq -r '.usage.output // 0')
-            cache_read=$(echo "$msg" | jq -r '.usage.cacheRead // 0')
-            cache_write=$(echo "$msg" | jq -r '.usage.cacheWrite // 0')
-            cost=$(compute_cost "$input" "$output" "$cache_read" "$cache_write" "$model")
-        fi
-        
-        if [[ -n "$cost" && "$cost" != "null" ]]; then
-        type_costs["$type"]=$(awk "BEGIN {print ${type_costs[$type]:-0} + $cost}")
-        total_cost=$(awk "BEGIN {print $total_cost + $cost}")
-            
-            if [[ -n "$model" && "$model" != "null" ]]; then
-                model_costs["$model"]=$(awk "BEGIN {print ${model_costs[$model]:-0} + $cost}")
-            fi
-        fi
-    done < "$session_file"
-done
+    # Accumulate
+    type_costs["$type"]=$(awk "BEGIN {print ${type_costs[$type]:-0} + $cost}")
+    model_costs["$model"]=$(awk "BEGIN {print ${model_costs[$model]:-0} + $cost}")
+    total_cost=$(awk "BEGIN {print $total_cost + $cost}")
+done < "$TEMP_RESULTS"
 
 # Output results
 echo "OpenClaw Cost Report (last ${DAYS} day(s))"
@@ -143,7 +146,7 @@ echo ""
 
 for type in interactive cron slack heartbeat; do
     cost="${type_costs[$type]:-0}"
-    if [[ $(awk "BEGIN {print ($cost > 0.001)}") -eq 1 ]]; then
+    if awk "BEGIN {exit !($cost > 0.001)}"; then
         printf "%-20s \$%.2f\n" "${type^}:" "$cost"
     fi
 done
@@ -155,7 +158,7 @@ echo "By Model:"
 for model in "${!model_costs[@]}"; do
     cost="${model_costs[$model]}"
     # Skip zero-cost or delivery models
-    if [[ $(awk "BEGIN {print ($cost > 0.001)}") -eq 0 || "$model" == "delivery-mirror" ]]; then
+    if ! awk "BEGIN {exit !($cost > 0.001)}" || [[ "$model" == "delivery-mirror" ]]; then
         continue
     fi
     pct=$(awk "BEGIN {printf \"%.1f\", $cost * 100 / $total_cost}")

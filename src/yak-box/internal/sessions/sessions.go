@@ -189,7 +189,30 @@ func EnsureHomeDir(persona string) (string, error) {
 	if err := ensureHomeDir(persona); err != nil {
 		return "", err
 	}
-	return GetHomeDir(persona)
+	
+	// Pre-create .local directory structure with correct permissions
+	// to prevent Docker from creating it as root
+	homePath, err := GetHomeDir(persona)
+	if err != nil {
+		return "", err
+	}
+	
+	localDirs := []string{
+		filepath.Join(homePath, ".local"),
+		filepath.Join(homePath, ".local", "share"),
+		filepath.Join(homePath, ".local", "share", "opencode"),
+		filepath.Join(homePath, ".local", "state"),
+		filepath.Join(homePath, ".config"),
+		filepath.Join(homePath, ".cache"),
+	}
+	
+	for _, dir := range localDirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return "", fmt.Errorf("failed to create %s: %w", dir, err)
+		}
+	}
+	
+	return homePath, nil
 }
 
 // CleanHome removes a worker's persistent home directory

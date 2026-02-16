@@ -42,8 +42,12 @@ RUN curl -fsSL https://opencode.ai/install | bash && \
     cp /root/.opencode/bin/opencode /usr/local/bin/opencode && \
     chmod +x /usr/local/bin/opencode
 
-COPY yx /usr/local/bin/yx 2>/dev/null || echo "Warning: yx not found in build context - it will not be available in the container"
-RUN if [ -f /usr/local/bin/yx ]; then chmod +x /usr/local/bin/yx; fi
+# Copy yx binary if present in build context (wildcard makes it optional)
+COPY yx* /tmp/
+RUN if [ -f /tmp/yx ]; then \
+        mv /tmp/yx /usr/local/bin/yx && \
+        chmod +x /usr/local/bin/yx; \
+    fi
 
 # Trust any mounted workspace (container runs as root, repo owned by host user)
 RUN git config --global --add safe.directory '*'

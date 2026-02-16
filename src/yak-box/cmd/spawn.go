@@ -66,6 +66,11 @@ func runSpawn(args []string) error {
 		return fmt.Errorf("failed to resolve working directory: %w", err)
 	}
 
+	absYakPath, err := filepath.Abs(spawnYakPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve yak path: %w", err)
+	}
+
 	persona := persona.GetRandomPersona()
 
 	profile := runtime.GetResourceProfile(spawnResources)
@@ -106,7 +111,7 @@ func runSpawn(args []string) error {
 		ContainerName: "yak-worker-" + sanitizedName,
 		Runtime:       runtimeType,
 		CWD:           absCWD,
-		YakPath:       spawnYakPath,
+		YakPath:       absYakPath,
 		Tasks:         spawnYaks,
 		SpawnedAt:     time.Now(),
 		SessionName:   spawnSession,
@@ -132,7 +137,7 @@ func runSpawn(args []string) error {
 
 	for _, task := range spawnYaks {
 		assignment := persona.Name + " " + persona.Emoji
-		taskFile := filepath.Join(spawnYakPath, task, "assigned-to")
+		taskFile := filepath.Join(absYakPath, task, "assigned-to")
 		if err := os.WriteFile(taskFile, []byte(assignment), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to assign task %s: %v\n", task, err)
 		}

@@ -6,24 +6,18 @@ The Yakob orchestrator platform has two cost sources: OpenClaw Gateway (orchestr
 
 ## Problem Statement
 
-### The Ephemeral Worker Problem
+### The Original Ephemeral Worker Problem
 
-OpenCode workers run in Docker containers with their data stored on tmpfs:
+OpenCode workers initially ran in Docker containers with tmpfs storage. When a container stopped, all cost data was lost. An exit hook in `inner.sh` attempted to export costs before container shutdown, but this failed whenever containers crashed or were killed.
 
-```
---tmpfs /home/worker:rw,exec,size=1g
-```
+### The Solution: Persistent Worker Homes
 
-When a container stops, all cost data is lost forever. This was the critical gap this system addresses.
+Workers now have persistent home directories at `.yak-boxes/@home/{Persona}/`. The OpenCode SQLite database survives at `.yak-boxes/@home/{Persona}/.local/share/opencode/opencode.db` regardless of how the container shuts down. Cost data is queried directly from these databases on demand — no export step required.
 
-### Data Sources Already Exist
+### Data Sources
 
-Neither OpenClaw nor OpenCode need modification — both already track costs:
-
-- **OpenCode**: `opencode stats`, `opencode export <session>`
+- **OpenCode**: SQLite DB at each worker's persistent home (`opencode db` CLI for queries)
 - **OpenClaw**: JSONL transcripts with per-message usage/cost
-
-The job is extraction, not implementation.
 
 ## Architecture
 
@@ -38,39 +32,63 @@ The job is extraction, not implementation.
           │ spawns via yak-box spawn
           ▼
 ┌─────────────────────────────────┐
-│  OpenCode Workers (Docker)      │  Ephemeral containers
-│  ├─ opencode.db (tmpfs!)        │  ⚠️ LOST when container stops
-│  ├─ opencode stats              │  CLI cost reporting
-│  └─ opencode export <session>   │  JSON export with cost
+│  OpenCode Workers (Docker)      │  Containers with persistent homes
+│  └─ opencode.db                 │  SQLite DB (persists via bind mount)
 └─────────────────────────────────┘
           │
-          │ exit hook → writes to bind-mounted dir
+          │ bind-mounted persistent home
           ▼
 ┌─────────────────────────────────┐
-│  .worker-costs/                 │  Persistent storage
-│  ├─ {Worker}-{timestamp}.json   │  Full session exports
-│  ├─ {Worker}-{timestamp}.stats  │  Human-readable stats
-│  └─ daily-totals.csv            │  Historical data
+│  .yak-boxes/@home/{Persona}/    │  Persistent storage per worker
+│  └─ .local/share/opencode/      │
+│      └─ opencode.db             │  ✅ Survives crashes, kills, restarts
+└─────────────────────────────────┘
+          │
+          │ queried on demand by cost scripts
+          ▼
+┌─────────────────────────────────┐
+│  Cost Reporting Scripts         │
+│  ├─ cost-workers.sh             │  Direct DB queries for worker costs
+│  ├─ cost-recover.sh             │  Session export recovery (idempotent)
+│  ├─ cost-openclaw.sh            │  OpenClaw JSONL cost extraction
+│  ├─ cost-summary.sh             │  Unified report (workers + openclaw)
+│  └─ .worker-costs/              │  Exported sessions + CSV history
 └─────────────────────────────────┘
 ```
 
 ## Components
 
-### 1. yak-box spawn (Exit Hook)
+### 1. cost-workers.sh (Primary Worker Cost Source)
 
-Modified the inner script template to capture cost data before container exit.
+Queries worker costs directly from persistent home SQLite databases. Computes token usage and estimated costs using a built-in pricing table. Works regardless of container state.
 
-**Key changes:**
-- Removed `exec` so cleanup runs after opencode exits
-- Capture full session export: `opencode export <session>`
-- Capture stats: `opencode stats --models`
-- Write to `.worker-costs/` (bind-mounted, survives container stop)
+**How it works:**
+- Iterates over `.yak-boxes/@home/*/`
+- Runs `opencode db` queries against each worker's `opencode.db`
+- Extracts `tokens.input`, `tokens.output`, `tokens.cache.read`, `tokens.cache.write`, and `modelID` from assistant messages
+- Computes costs using per-model pricing rates
 
-**Output files:**
-- `{Worker}-{timestamp}.json` — Full session with per-message costs
-- `{Worker}-{timestamp}.stats.txt` — Human-readable summary
+**Usage:**
+```bash
+./cost-workers.sh                  # TSV output (all time)
+./cost-workers.sh --summary        # Formatted per-worker summary
+./cost-workers.sh --days 1         # Last 24 hours only
+./cost-workers.sh --days 7 --summary  # Last week, formatted
+```
 
-### 2. cost-openclaw.sh
+**TSV output columns:** `persona  model  input_tokens  output_tokens  cache_read  cache_write  cost`
+
+### 2. cost-recover.sh (Session Export Recovery)
+
+Scans all persistent worker homes and exports sessions to `.worker-costs/`. Uses `opencode export` first, falls back to DB queries for token summaries. Idempotent — tracks exported sessions in `.worker-costs/.exported-sessions`.
+
+**Usage:**
+```bash
+./cost-recover.sh             # Export all unprocessed sessions
+./cost-recover.sh --dry-run   # Preview without exporting
+```
+
+### 3. cost-openclaw.sh
 
 Parses OpenClaw JSONL transcripts to extract costs by session type.
 
@@ -88,9 +106,9 @@ Parses OpenClaw JSONL transcripts to extract costs by session type.
 ./cost-openclaw.sh --all
 ```
 
-### 3. cost-summary.sh
+### 4. cost-summary.sh
 
-Unified reporting that combines both sources.
+Unified reporting that combines OpenClaw and worker costs. Worker costs are sourced from `cost-workers.sh` (DB-based), not from `.worker-costs/*.json` exports.
 
 **Usage:**
 ```bash
@@ -120,7 +138,7 @@ Models:
   claude-sonnet-4-5:   $16.96 (100.0%)
 ```
 
-### 4. yak-box check (Live Cost)
+### 5. yak-box check (Live Cost)
 
 Added live cost display for running Docker workers.
 
@@ -131,7 +149,7 @@ Live Cost:
   yak-worker-cost-track    $1.23
 ```
 
-### 5. CSV History
+### 6. CSV History
 
 Daily totals appended to `.worker-costs/daily-totals.csv`:
 
@@ -141,7 +159,7 @@ date,openclaw_cost,opencode_cost,total_cost,sessions,workers
 2026-02-15,8.50,6.20,14.70,3,2
 ```
 
-### 6. Daily Summary Cron
+### 7. Daily Summary Cron
 
 Updated the daily summary cron job to include cost data:
 
@@ -151,15 +169,15 @@ openclaw cron edit <JOB_ID> --message "... Run yx ls, yak-box check, and ./cost-
 
 ## Design Decisions
 
-### Why Capture-on-Exit (Option A)?
+### Why Persistent Homes + DB Queries?
 
 | Option | Approach | Pros | Cons |
 |--------|----------|------|------|
-| A: Capture-on-exit | Run before container stops | No mount changes, uses built-in tools | Misses if crash |
-| B: Bind-mount data | Mount `~/.local/share/opencode/` | Full data preservation | Needs path changes |
-| C: Periodic extraction | Cron `docker exec` into workers | Works while alive | Misses final costs |
+| A: Capture-on-exit | Export before container stops | Simple | Misses crashes/kills |
+| B: Persistent homes + DB queries | Query SQLite directly from host | **Crash-proof**, no export needed | Requires persistent home dirs |
+| C: Periodic extraction | Cron `docker exec` into workers | Works while alive | Misses final costs, extra overhead |
 
-Option A chosen for simplicity — uses tools already verified working.
+Option B chosen — persistent worker homes (`.yak-boxes/@home/`) were already implemented for other reasons, making this the natural and most reliable approach. The exit hook (Option A) remains as a secondary path but is no longer the primary cost capture mechanism.
 
 ### Why JSONL over WebSocket RPC?
 
@@ -175,11 +193,14 @@ All data kept indefinitely. No pruning — storage is cheap, data is valuable.
 
 | File | Purpose |
 |------|---------|
-| `bin/yak-box` | Worker spawner with exit hook |
+| `cost-workers.sh` | Direct DB queries for worker costs (primary) |
+| `cost-recover.sh` | Session export recovery (idempotent) |
 | `cost-openclaw.sh` | OpenClaw cost extractor |
-| `cost-summary.sh` | Unified cost reporter |
+| `cost-summary.sh` | Unified cost reporter (workers + openclaw) |
+| `bin/yak-box` | Worker spawner (includes exit hook as fallback) |
 | `bin/yak-box check` | Worker status + live cost |
-| `.worker-costs/` | Persistent cost data storage |
+| `.yak-boxes/@home/` | Persistent worker homes with SQLite DBs |
+| `.worker-costs/` | Exported sessions + CSV history |
 | `.worker-costs/daily-totals.csv` | Historical totals |
 
 ## Integration Points
@@ -204,12 +225,13 @@ The 17:00 UTC cron job now runs:
 
 ## Pricing Model
 
-The system uses approximate pricing from OpenClaw transcripts when cost isn't explicitly recorded:
+Token-based cost computation using per-model rates (applied by `cost-workers.sh`):
 
 | Model | Input ($/M) | Output ($/M) | Cache Read | Cache Write |
 |-------|-------------|--------------|------------|-------------|
-| claude-opus-4-5 | $15.00 | $75.00 | $0.60 | $0.30 |
-| claude-sonnet-4-5 | $3.00 | $15.00 | $0.30 | $0.15 |
-| claude-haiku-4-5 | $0.80 | $4.00 | $0.10 | $0.05 |
+| claude-opus-4-5/4-6 | $15.00 | $75.00 | $0.60 | $0.30 |
+| claude-sonnet-4-4/4-5 | $3.00 | $15.00 | $0.30 | $0.15 |
+| claude-haiku-4-4/4-5 | $0.80 | $4.00 | $0.10 | $0.05 |
+| gemini-2.5-pro/3-pro | $1.25 | $10.00 | $0.315 | $0.315 |
 
-Note: These are estimates. Actual costs may vary based on provider pricing.
+Workers use the `github-copilot` provider which reports 0 for the `cost` field — costs are computed from token counts instead. Model names in the DB use dots (e.g., `claude-sonnet-4.5`); the pricing lookup normalizes to dashes.

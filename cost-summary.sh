@@ -49,7 +49,7 @@ fi
 OPENCLAW_OUTPUT=$("${OPENCLAW_SCRIPT}" "$DAYS" 2>/dev/null || true)
 
 # Extract data from cached output
-openclaw_cost=$(echo "$OPENCLAW_OUTPUT" | grep "^Total:" | awk '{print $2}' | tr -d '$')
+openclaw_cost=$(echo "$OPENCLAW_OUTPUT" | grep "^Total:" | awk '{print $2}' | tr -d '$' || true)
 [[ -z "$openclaw_cost" ]] && openclaw_cost="0"
 
 # Count session types
@@ -66,7 +66,7 @@ echo "OpenClaw (Orchestrator):"
 printf "  Total:                   \$%.2f\n" "$openclaw_cost"
 
 # Get breakdown from cached output
-echo "$OPENCLAW_OUTPUT" | grep -E "^(Interactive|Cron|Slack|Heartbeat):" | while read -r line; do
+echo "$OPENCLAW_OUTPUT" | { grep -E "^(Interactive|Cron|Slack|Heartbeat):" || true; } | while read -r line; do
     printf "  %s\n" "$line"
 done
 
@@ -74,31 +74,21 @@ echo ""
 
 # OpenCode worker costs
 echo "OpenCode (Workers):"
-total_worker_cost=0
-worker_count=0
+WORKER_SCRIPT="${SCRIPT_DIR}/cost-workers.sh"
 
-if [[ -d "$WORKER_COSTS" ]]; then
-    # Parse worker exports - use single jq per file for efficiency
-    for json_file in "${WORKER_COSTS}"/*.json; do
-        [[ -f "$json_file" ]] || continue
-        
-        # Extract worker name from filename (e.g., Yakriel-20260214T123456Z.json)
-        worker=$(basename "$json_file" | cut -d'-' -f1)
-        
-        # Single jq query to sum all costs in file (worker JSON has messages[].info.cost)
-        cost=$(jq '[.messages[].info.cost // 0] | add' "$json_file" 2>/dev/null || echo "0")
-        [[ -z "$cost" || "$cost" == "null" ]] && cost="0"
-        
-        printf "  %-20s \$%.2f\n" "$worker:" "$cost"
-        total_worker_cost=$(awk "BEGIN {print $total_worker_cost + $cost}")
-        worker_count=$((worker_count + 1))
-    done
-    
-    if [[ $worker_count -eq 0 ]]; then
-        echo "  (no worker runs in period)"
-    fi
+if [[ -x "$WORKER_SCRIPT" ]]; then
+    worker_output=$("$WORKER_SCRIPT" --days "$DAYS" --summary 2>/dev/null || true)
+    echo "$worker_output" | grep -v "^$" | grep -v "Total:" || true
+
+    total_worker_cost=$(echo "$worker_output" | grep "Total:" | awk '{print $2}' | tr -d '$')
+    [[ -z "$total_worker_cost" ]] && total_worker_cost="0"
+    worker_count=$(echo "$worker_output" | grep -cE '^\s+\S+:' | head -1 || true)
+    worker_count=$((worker_count - 1))
+    [[ $worker_count -lt 0 ]] && worker_count=0
 else
-    echo "  (no cost data captured yet)"
+    echo "  (cost-workers.sh not found)"
+    total_worker_cost=0
+    worker_count=0
 fi
 
 echo ""
@@ -110,7 +100,7 @@ printf "                          Total: \$%.2f\n" "$grand_total"
 # Model breakdown from cached output
 echo ""
 echo "Models:"
-echo "$OPENCLAW_OUTPUT" | sed -n '/^By Model:/,/^[A-Z]/p' | grep -v "^By Model:" | grep -v "^[A-Z]" | grep -v "^$" | head -5
+echo "$OPENCLAW_OUTPUT" | sed -n '/^By Model:/,/^[A-Z]/p' | { grep -v "^By Model:" | grep -v "^[A-Z]" | grep -v "^$" | head -5 || true; }
 
 # Append to CSV if requested
 if [[ "$APPEND_CSV" == "true" ]]; then

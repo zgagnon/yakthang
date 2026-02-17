@@ -13,18 +13,20 @@ import (
 	"github.com/yakthang/yakbox/internal/runtime"
 	"github.com/yakthang/yakbox/internal/sessions"
 	"github.com/yakthang/yakbox/pkg/types"
+	"github.com/yakthang/yakbox/pkg/worktree"
 )
 
 var (
-	spawnCWD       string
-	spawnName      string
-	spawnSession   string
-	spawnMode      string
-	spawnResources string
-	spawnYaks      []string
-	spawnYakPath   string
-	spawnRuntime   string
-	spawnClean     bool
+	spawnCWD          string
+	spawnName         string
+	spawnSession      string
+	spawnMode         string
+	spawnResources    string
+	spawnYaks         []string
+	spawnYakPath      string
+	spawnRuntime      string
+	spawnClean        bool
+	spawnAutoWorktree bool
 )
 
 var spawnCmd = &cobra.Command{
@@ -39,6 +41,9 @@ Sandboxed mode (default): Uses Docker container with resource limits and isolati
 Native mode: Runs opencode directly on the host with full system access.`,
 	Example: `  # Spawn a worker for API authentication tasks
   yak-box spawn --cwd ./api --name api-auth --yaks auth/api/login --yaks auth/api/logout
+
+  # Spawn with automatic worktree creation
+  yak-box spawn --cwd ./api --name api-auth --yaks auth/api --auto-worktree
 
   # Spawn with heavy resources and native runtime
   yak-box spawn --cwd ./backend --name backend-worker --resources heavy --runtime native
@@ -70,6 +75,24 @@ func runSpawn(args []string) error {
 	absYakPath, err := filepath.Abs(spawnYakPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve yak path: %w", err)
+	}
+
+	// Handle automatic worktree creation if flag is set
+	worktreePath := ""
+	if spawnAutoWorktree && len(spawnYaks) > 0 {
+		// Use the first task for worktree creation
+		taskPath := spawnYaks[0]
+		fmt.Printf("Creating worktree for task: %s\n", taskPath)
+
+		wt, err := worktree.EnsureWorktree(absCWD, taskPath, true)
+		if err != nil {
+			return fmt.Errorf("failed to ensure worktree: %w", err)
+		}
+
+		worktreePath = wt
+		// Update CWD to point to the worktree
+		absCWD = wt
+		fmt.Printf("Using worktree: %s\n", wt)
 	}
 
 	persona := persona.GetRandomPersona()
@@ -128,6 +151,7 @@ func runSpawn(args []string) error {
 		Tasks:         spawnYaks,
 		SpawnedAt:     time.Now(),
 		SessionName:   spawnSession,
+		WorktreePath:  worktreePath,
 	}
 
 	if runtimeType == "sandboxed" {
@@ -169,6 +193,14 @@ func runSpawn(args []string) error {
 		if err := os.WriteFile(taskFile, []byte(assignment), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to assign task %s: %v\n", task, err)
 		}
+
+		// Write worktree path if auto-worktree was used
+		if worktreePath != "" {
+			worktreeFile := filepath.Join(absYakPath, task, "worktree-path")
+			if err := os.WriteFile(worktreeFile, []byte(worktreePath), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to write worktree path for task %s: %v\n", task, err)
+			}
+		}
 	}
 
 	fmt.Printf("Spawned %s (%s) in %s\n", persona.Name, spawnName, runtimeType)
@@ -191,4 +223,5 @@ func init() {
 	spawnCmd.Flags().StringVar(&spawnYakPath, "yak-path", ".yaks", "Path to task state directory")
 	spawnCmd.Flags().StringVar(&spawnRuntime, "runtime", "auto", "Runtime: 'auto', 'sandboxed', or 'native'")
 	spawnCmd.Flags().BoolVar(&spawnClean, "clean", false, "Clean worker home directory before spawning")
+	spawnCmd.Flags().BoolVar(&spawnAutoWorktree, "auto-worktree", false, "Automatically create and use git worktree for the task")
 }

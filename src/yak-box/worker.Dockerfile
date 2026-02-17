@@ -23,6 +23,10 @@ RUN curl -fsSL https://opencode.ai/install | bash \
 COPY yx /usr/local/bin/yx
 RUN chmod +x /usr/local/bin/yx
 
+# Copy dynamic user creation entrypoint
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Trust any mounted workspace (container runs as root, repo owned by host user)
 RUN git config --global --add safe.directory '*'
 
@@ -32,8 +36,8 @@ RUN useradd -m -s /bin/bash worker
 # Set working directory
 WORKDIR /workspace
 
-# No entrypoint — spawn-worker.sh specifies the full command
-ENTRYPOINT []
+# Use entrypoint to dynamically create user if needed
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Document the per-project extension pattern
 LABEL description="Minimal Yak worker base image. Projects extend with: FROM yak-worker:latest"

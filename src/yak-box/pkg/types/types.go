@@ -19,6 +19,7 @@ type Worker struct {
 	Tasks         []string
 	SpawnedAt     time.Time
 	SessionName   string
+	WorktreePath  string // Path to git worktree (if using --auto-worktree)
 }
 
 type ResourceProfile struct {

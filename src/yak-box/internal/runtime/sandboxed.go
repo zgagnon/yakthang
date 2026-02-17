@@ -186,7 +186,11 @@ exit 1
 		homeMount = fmt.Sprintf("\t-v \"%s:/home/yak-shaver:rw\" \\", homeDir)
 	}
 
-	// Mount OpenCode auth.json for GitHub Copilot model access
+	worktreeMount := ""
+	if worker.WorktreePath != "" {
+		worktreeMount = fmt.Sprintf("\t-v \"%s:%s:rw\" \\", worker.WorktreePath, worker.WorktreePath)
+	}
+
 	homeDir_host := os.Getenv("HOME")
 	authMount := fmt.Sprintf("\t-v \"%s/.local/share/opencode/auth.json:/home/yak-shaver/.local/share/opencode/auth.json:ro\" \\", homeDir_host)
 
@@ -208,6 +212,7 @@ exec docker run -t --rm \
 	-v "%s:/opt/worker/start.sh:ro" \
 %s
 %s
+%s
 	-w "%s" \
 	-e HOME=/home/yak-shaver \
 	-e GOPATH=/home/yak-shaver/.go \
@@ -218,7 +223,7 @@ exec docker run -t --rm \
 	-e YAK_PATH="%s" \
 	yak-shaver:latest \
 	bash /opt/worker/start.sh build
-`, containerName, os.Getuid(), os.Getgid(), networkMode, profile.CPUs, profile.Memory, swapFlag, profile.PIDs, workspaceRoot, workspaceRoot, worker.YakPath, worker.YakPath, promptFile, innerScript, homeMount, authMount, worker.CWD, cargoJobsEnv, persona.Name, persona.Emoji, worker.YakPath)
+`, containerName, os.Getuid(), os.Getgid(), networkMode, profile.CPUs, profile.Memory, swapFlag, profile.PIDs, workspaceRoot, workspaceRoot, worker.YakPath, worker.YakPath, promptFile, innerScript, homeMount, worktreeMount, authMount, worker.CWD, cargoJobsEnv, persona.Name, persona.Emoji, worker.YakPath)
 
 	if err := os.WriteFile(wrapperScript, []byte(wrapperContent), 0755); err != nil {
 		return fmt.Errorf("failed to write wrapper script: %w", err)

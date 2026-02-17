@@ -96,16 +96,16 @@ func runStop() error {
 
 	if session.Runtime == "sandboxed" {
 		if stopDryRun {
-			fmt.Printf("[dry-run] Would stop container: %s\n", session.Container)
 			fmt.Printf("[dry-run] Would close Zellij tab: %s\n", session.DisplayName)
+			fmt.Printf("[dry-run] Would stop container: %s\n", session.Container)
 		} else {
-			fmt.Println("Stopping container...")
-			if err := runtime.StopSandboxedWorker(stopName, timeout); err != nil {
-				fmt.Printf("Warning: %v\n", err)
-			}
 			fmt.Println("Closing Zellij tab...")
 			if err := runtime.StopNativeWorker(session.DisplayName, session.ZellijSession); err != nil {
 				fmt.Printf("Warning: failed to close tab: %v\n", err)
+			}
+			fmt.Println("Stopping container...")
+			if err := runtime.StopSandboxedWorker(stopName, timeout); err != nil {
+				fmt.Printf("Warning: %v\n", err)
 			}
 		}
 	} else if session.Runtime == "native" {

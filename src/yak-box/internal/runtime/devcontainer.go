@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -100,9 +101,26 @@ func getDevcontainerCommit(workspaceRoot string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
 // EnsureDevcontainer ensures the Docker image exists and is up-to-date
 func EnsureDevcontainer() error {
+	workspaceRoot, err := findWorkspaceRoot()
+	if err != nil {
+		return fmt.Errorf("failed to find workspace root: %w", err)
+	}
+
+	devcontainerDir := filepath.Join(workspaceRoot, devcontainerPath)
+	hasDevcontainer := dirExists(devcontainerDir)
+
 	if imageExists, err := ImageExists(); err == nil && imageExists {
+		// If there's no .devcontainer dir, image is considered up-to-date as-is
+		if !hasDevcontainer {
+			return nil
+		}
 		upToDate, err := isImageUpToDate()
 		if err != nil {
 			return fmt.Errorf("failed to check image status: %w", err)
@@ -111,6 +129,11 @@ func EnsureDevcontainer() error {
 			return RebuildDevcontainer()
 		}
 		return nil
+	}
+
+	// Image doesn't exist
+	if !hasDevcontainer {
+		return fmt.Errorf("yak-shaver:latest image not found and no .devcontainer/Dockerfile to build from")
 	}
 
 	fmt.Println("Building yak-shaver image for the first time...")

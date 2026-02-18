@@ -24,9 +24,10 @@ func SpawnNativeWorker(worker *types.Worker, persona *types.Persona, prompt stri
 
 	wrapperScript := filepath.Join(workerDir, "run.sh")
 	wrapperContent := fmt.Sprintf(`#!/usr/bin/env bash
+export YAK_PATH="%s"
 PROMPT="$(cat "%s")"
 exec opencode --prompt "$PROMPT" --agent build
-`, promptFile)
+`, worker.YakPath, promptFile)
 	if err := os.WriteFile(wrapperScript, []byte(wrapperContent), 0755); err != nil {
 		return fmt.Errorf("failed to write wrapper script: %w", err)
 	}

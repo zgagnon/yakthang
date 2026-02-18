@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yakthang/yakbox/pkg/devcontainer"
 	"github.com/yakthang/yakbox/pkg/types"
 )
 
@@ -98,7 +99,7 @@ func GetNetworkMode() string {
 }
 
 // SpawnSandboxedWorker spawns a worker in a Docker container via Zellij tab
-func SpawnSandboxedWorker(worker *types.Worker, persona *types.Persona, prompt string, profile types.ResourceProfile, homeDir string) error {
+func SpawnSandboxedWorker(worker *types.Worker, persona *types.Persona, prompt string, profile types.ResourceProfile, homeDir string, devConfig *devcontainer.Config) error {
 	containerName := containerNamePrefix + worker.Name
 	networkMode := GetNetworkMode()
 	workspaceRoot, err := findWorkspaceRoot()
@@ -183,16 +184,49 @@ exit 1
 
 	homeMount := ""
 	if homeDir != "" {
-		homeMount = fmt.Sprintf("\t-v \"%s:/home/yak-shaver:rw\" \\", homeDir)
+		homeMount = fmt.Sprintf("\n\t-v \"%s:/home/yak-shaver:rw\" \\", homeDir)
 	}
 
 	worktreeMount := ""
 	if worker.WorktreePath != "" {
-		worktreeMount = fmt.Sprintf("\t-v \"%s:%s:rw\" \\", worker.WorktreePath, worker.WorktreePath)
+		worktreeMount = fmt.Sprintf("\n\t-v \"%s:%s:rw\" \\", worker.WorktreePath, worker.WorktreePath)
 	}
 
 	homeDir_host := os.Getenv("HOME")
-	authMount := fmt.Sprintf("\t-v \"%s/.local/share/opencode/auth.json:/home/yak-shaver/.local/share/opencode/auth.json:ro\" \\", homeDir_host)
+	authMount := fmt.Sprintf("\n\t-v \"%s/.local/share/opencode/auth.json:/home/yak-shaver/.local/share/opencode/auth.json:ro\" \\", homeDir_host)
+
+	imageName := "yak-shaver:latest"
+	additionalEnv := ""
+	additionalMounts := ""
+
+	if devConfig != nil {
+		if devConfig.Image != "" {
+			imageName = devConfig.Image
+		}
+
+		ctx := &devcontainer.SubstituteContext{
+			LocalWorkspaceFolder:     worker.CWD,
+			ContainerWorkspaceFolder: worker.CWD,
+			LocalEnv:                 make(map[string]string),
+			ContainerEnv:             make(map[string]string),
+		}
+
+		for _, envVar := range os.Environ() {
+			kv := strings.SplitN(envVar, "=", 2)
+			if len(kv) == 2 {
+				ctx.LocalEnv[kv[0]] = kv[1]
+			}
+		}
+
+		resolvedEnv := devConfig.GetResolvedEnvironment(ctx)
+		for k, v := range resolvedEnv {
+			additionalEnv += fmt.Sprintf("\n\t-e %s=\"%s\" \\", k, v)
+		}
+
+		for _, mount := range devConfig.Mounts {
+			additionalMounts += fmt.Sprintf("\n\t-v \"%s\" \\", mount)
+		}
+	}
 
 	// Generate custom /etc/passwd and /etc/group for the container
 	// so the host UID/GID resolves to a named user instead of "I have no name!"
@@ -208,7 +242,7 @@ exit 1
 	if err := os.WriteFile(groupFile, []byte(groupContent), 0644); err != nil {
 		return fmt.Errorf("failed to write group file: %w", err)
 	}
-	passwdMount := fmt.Sprintf("\t-v \"%s:/etc/passwd:ro\" \\\n\t-v \"%s:/etc/group:ro\" \\", passwdFile, groupFile)
+	passwdMount := fmt.Sprintf("\n\t-v \"%s:/etc/passwd:ro\" \\\n\t-v \"%s:/etc/group:ro\" \\", passwdFile, groupFile)
 
 	wrapperContent := fmt.Sprintf(`#!/usr/bin/env bash
 exec docker run -it --rm \
@@ -225,11 +259,7 @@ exec docker run -it --rm \
 	-v "%s:%s:rw" \
 	-v "%s:%s:rw" \
 	-v "%s:/opt/worker/prompt.txt:ro" \
-	-v "%s:/opt/worker/start.sh:ro" \
-%s
-%s
-%s
-%s
+	-v "%s:/opt/worker/start.sh:ro" \%s%s%s%s%s
 	-w "%s" \
 	-e HOME=/home/yak-shaver \
 	-e TERM="${TERM:-xterm-256color}" \
@@ -238,10 +268,10 @@ exec docker run -it --rm \
 	-e RUSTUP_HOME=/home/yak-shaver/.rustup \
 %s	-e WORKER_NAME="%s" \
 	-e WORKER_EMOJI="%s" \
-	-e YAK_PATH="%s" \
-	yak-shaver:latest \
+	-e YAK_PATH="%s" \%s
+	%s \
 	bash /opt/worker/start.sh build
-`, containerName, os.Getuid(), os.Getgid(), networkMode, profile.CPUs, profile.Memory, swapFlag, profile.PIDs, workspaceRoot, workspaceRoot, worker.YakPath, worker.YakPath, promptFile, innerScript, homeMount, worktreeMount, authMount, passwdMount, worker.CWD, cargoJobsEnv, persona.Name, persona.Emoji, worker.YakPath)
+`, containerName, os.Getuid(), os.Getgid(), networkMode, profile.CPUs, profile.Memory, swapFlag, profile.PIDs, workspaceRoot, workspaceRoot, worker.YakPath, worker.YakPath, promptFile, innerScript, homeMount, worktreeMount, authMount, passwdMount, additionalMounts, worker.CWD, cargoJobsEnv, persona.Name, persona.Emoji, worker.YakPath, additionalEnv, imageName)
 
 	if err := os.WriteFile(wrapperScript, []byte(wrapperContent), 0755); err != nil {
 		return fmt.Errorf("failed to write wrapper script: %w", err)

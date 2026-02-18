@@ -12,6 +12,7 @@ import (
 	"github.com/yakthang/yakbox/internal/prompt"
 	"github.com/yakthang/yakbox/internal/runtime"
 	"github.com/yakthang/yakbox/internal/sessions"
+	"github.com/yakthang/yakbox/pkg/devcontainer"
 	"github.com/yakthang/yakbox/pkg/types"
 	"github.com/yakthang/yakbox/pkg/worktree"
 )
@@ -109,6 +110,11 @@ func runSpawn(args []string) error {
 		return fmt.Errorf("failed to ensure home directory: %w", err)
 	}
 
+	devConfig, err := devcontainer.LoadConfig(absCWD)
+	if err != nil {
+		return fmt.Errorf("failed to load devcontainer config: %w", err)
+	}
+
 	profile := runtime.GetResourceProfile(spawnResources)
 
 	userPrompt := "Work on the assigned tasks."
@@ -159,7 +165,7 @@ func runSpawn(args []string) error {
 			return fmt.Errorf("failed to ensure devcontainer: %w\n\nTo try native mode instead, run:\n  yak-box spawn --runtime=native [same options]", err)
 		}
 
-		if err := runtime.SpawnSandboxedWorker(worker, &persona, workerPrompt, profile, homeDir); err != nil {
+		if err := runtime.SpawnSandboxedWorker(worker, &persona, workerPrompt, profile, homeDir, devConfig); err != nil {
 			return fmt.Errorf("failed to spawn sandboxed worker: %w\n\nTo try native mode instead, run:\n  yak-box spawn --runtime=native [same options]", err)
 		}
 	} else {

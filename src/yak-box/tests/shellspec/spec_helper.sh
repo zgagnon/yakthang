@@ -50,7 +50,7 @@ setup_test_environment() {
 	mkdir -p ".yaks/test-task"
 	echo "Integration test task" >".yaks/test-task/description"
 	# Unique session and worker names to avoid conflicts
-	TEST_ZELLIJ_SESSION="yak-box-test-$$"
+	TEST_ZELLIJ_SESSION="${ZELLIJ_SESSION_NAME:-yakthang}"
 	TEST_WORKER_NAME="test-worker-$$"
 	export TEST_PROJECT_DIR TEST_WORK_DIR TEST_ZELLIJ_SESSION TEST_WORKER_NAME
 }

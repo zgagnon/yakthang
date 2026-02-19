@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/yakthang/yakbox/pkg/types"
 )
@@ -68,7 +69,10 @@ exec opencode --prompt "$PROMPT" --agent build
 	return nil
 }
 
-// StopNativeWorker stops a native worker by closing the Zellij tab
+// StopNativeWorker stops a native worker by closing the Zellij tab.
+// Uses query-tab-names to find the tab's index, then navigates by index
+// before closing. This avoids the race where go-to-tab-name fails silently
+// and close-tab kills whatever tab happens to be focused.
 func StopNativeWorker(name, sessionName string) error {
 	root, _ := findWorkspaceRoot()
 	closeTabScript := filepath.Join(root, "close-zellij-tab.sh")
@@ -87,28 +91,57 @@ func StopNativeWorker(name, sessionName string) error {
 		return nil
 	}
 
-	// Fallback: use two-step close (go-to-tab-name + close-tab)
-	// Note: zellij close-tab doesn't have a -n flag, must navigate first
-	var goToCmd, closeCmd *exec.Cmd
+	tabIndex, err := findZellijTabIndex(name, sessionName)
+	if err != nil {
+		return err
+	}
+	if tabIndex == -1 {
+		return nil
+	}
+
+	var goCmd, closeCmd *exec.Cmd
 	if sessionName != "" {
-		goToCmd = exec.Command("zellij", "--session", sessionName, "action", "go-to-tab-name", name)
+		goCmd = exec.Command("zellij", "--session", sessionName, "action", "go-to-tab", fmt.Sprintf("%d", tabIndex))
 		closeCmd = exec.Command("zellij", "--session", sessionName, "action", "close-tab")
 	} else {
-		goToCmd = exec.Command("zellij", "action", "go-to-tab-name", name)
+		goCmd = exec.Command("zellij", "action", "go-to-tab", fmt.Sprintf("%d", tabIndex))
 		closeCmd = exec.Command("zellij", "action", "close-tab")
 	}
 
-	// Navigate to the tab
-	if err := goToCmd.Run(); err != nil {
-		return fmt.Errorf("failed to navigate to tab '%s': %w", name, err)
+	if err := goCmd.Run(); err != nil {
+		return fmt.Errorf("failed to navigate to tab index %d (%s): %w", tabIndex, name, err)
 	}
 
-	// Close the current (now focused) tab
 	if err := closeCmd.Run(); err != nil {
 		return fmt.Errorf("failed to close tab: %w", err)
 	}
 
 	return nil
+}
+
+// findZellijTabIndex queries Zellij for all tab names and returns the 1-based
+// index of the tab matching the given name. Returns -1 if not found.
+func findZellijTabIndex(name, sessionName string) (int, error) {
+	var queryCmd *exec.Cmd
+	if sessionName != "" {
+		queryCmd = exec.Command("zellij", "--session", sessionName, "action", "query-tab-names")
+	} else {
+		queryCmd = exec.Command("zellij", "action", "query-tab-names")
+	}
+
+	output, err := queryCmd.Output()
+	if err != nil {
+		return -1, fmt.Errorf("failed to query tab names: %w", err)
+	}
+
+	tabs := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for i, tab := range tabs {
+		if tab == name {
+			return i + 1, nil // Zellij tabs are 1-indexed
+		}
+	}
+
+	return -1, nil
 }
 
 func fileExists(path string) bool {

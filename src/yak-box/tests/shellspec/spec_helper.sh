@@ -62,10 +62,16 @@ teardown_test_environment() {
 	docker rm -f "yak-worker-${TEST_WORKER_NAME}" 2>/dev/null || true
 	# Wildcard cleanup to catch any variant
 	docker ps -a --filter "name=${TEST_WORKER_NAME}" -q 2>/dev/null | xargs -r docker rm -f 2>/dev/null || true
-	# Clean up Zellij tabs in test session (repeat to catch multiple tabs)
-	zellij --session "$TEST_ZELLIJ_SESSION" action close-tab 2>/dev/null || true
-	zellij --session "$TEST_ZELLIJ_SESSION" action close-tab 2>/dev/null || true
-	zellij --session "$TEST_ZELLIJ_SESSION" action close-tab 2>/dev/null || true
+	# Close only the worker's tab by querying for its exact index
+	local tab_names tab_index
+	tab_names=$(zellij --session "$TEST_ZELLIJ_SESSION" action query-tab-names 2>/dev/null) || true
+	if [ -n "$tab_names" ]; then
+		tab_index=$(echo "$tab_names" | grep -n "^${TEST_WORKER_NAME}$" | cut -d: -f1)
+		if [ -n "$tab_index" ]; then
+			zellij --session "$TEST_ZELLIJ_SESSION" action go-to-tab "$tab_index" 2>/dev/null || true
+			zellij --session "$TEST_ZELLIJ_SESSION" action close-tab 2>/dev/null || true
+		fi
+	fi
 	# Restore directory and remove temp work dir
 	cd "$TEST_PROJECT_DIR" || return
 	rm -rf "$TEST_WORK_DIR"

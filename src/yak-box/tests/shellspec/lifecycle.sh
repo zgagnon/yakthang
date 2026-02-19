@@ -8,6 +8,7 @@ Skip if "yak-box binary not found" yakbox_binary_unavailable
 
 It 'spawns a sandboxed worker'
 run_spawn() {
+	echo "    → spawning container + zellij tab..." >/dev/tty
 	yak-box spawn \
 		--cwd "$TEST_WORK_DIR" \
 		--name "$TEST_WORKER_NAME" \
@@ -66,7 +67,8 @@ End
 It 'stops the worker and reports success'
 run_stop() {
 	cd "$TEST_WORK_DIR" || return 1
-	yak-box stop --name "$TEST_WORKER_NAME"
+	echo "    → closing tab + stopping container (timeout 2s)..." >/dev/tty
+	yak-box stop --name "$TEST_WORKER_NAME" --timeout 2s
 }
 When call run_stop
 The status should be success
@@ -75,6 +77,7 @@ End
 
 It 'removes container after stop'
 check_container_gone() {
+	echo "    → waiting for container removal..." >/dev/tty
 	wait_for_container_gone "$TEST_WORKER_NAME"
 }
 When call check_container_gone

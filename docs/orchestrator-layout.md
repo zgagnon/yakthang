@@ -27,8 +27,10 @@ The orchestrator tab ("Yakob's 🛖") is a vertical split with three panes:
 
 ### Yak-map pane (left, 33%)
 
-Runs `watch --color --no-title --no-wrap --interval 2 "yx ls"`, providing a
-live view of all tasks and their states. Refreshes every 2 seconds. This is
+Runs the **YakMap Zellij WASM plugin** (`bin/yak-map.wasm`), providing a
+live view of all tasks and their states. The plugin reads `.yaks/` directly
+(no dependency on the `yx` binary) and auto-refreshes every 2 seconds. It
+supports keyboard navigation (↑/↓) and color-coded task status. This is
 the orchestrator's primary situational awareness tool.
 
 ### Orchestrator pane (right top, ~80% of 67%)
@@ -79,8 +81,9 @@ tab. Everything else is spawned from there.
 
 - **Zellij over tmux**: Zellij's KDL layouts and `new-tab --layout` command
   make it possible to define worker tab structure declaratively.
-- **Watch for the yak-map**: A simple `watch` loop over `yx ls` is sufficient
-  for live task state. No custom daemon needed.
+- **YakMap WASM plugin**: The left pane runs a compiled Rust plugin that reads
+  `.yaks/` directly, providing richer visualization (tree rendering, color
+  coding, keyboard navigation) than the previous `watch` + `yx ls` approach.
 - **Opencode for both orchestrator and workers**: The orchestrator runs
   interactive opencode; workers run via `yak-box spawn`.
 - **Focus returns to orchestrator**: After spawning a worker tab,

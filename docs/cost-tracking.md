@@ -135,7 +135,7 @@ OpenCode (Workers):
                           Total: $16.96
 
 Models:
-  claude-sonnet-4-5:   $16.96 (100.0%)
+  claude-sonnet-4-6:   $16.96 (100.0%)
 ```
 
 ### 5. yak-box check (Live Cost)
@@ -225,13 +225,23 @@ The 17:00 UTC cron job now runs:
 
 ## Pricing Model
 
-Token-based cost computation using per-model rates (applied by `cost-workers.sh`):
+Workers use the `github-copilot` provider which bills via **premium requests** (flat subscription + overage at $0.04/request × model multiplier), not per-token. The `cost` field in the OpenCode DB is always `0` for this provider.
+
+`cost-workers.sh` computes a **token-equivalent cost** using direct-API rates from each provider. This gives a comparable spend figure for budgeting. It is not the literal Copilot invoice amount but is directionally accurate.
 
 | Model | Input ($/M) | Output ($/M) | Cache Read | Cache Write |
 |-------|-------------|--------------|------------|-------------|
-| claude-opus-4-5/4-6 | $15.00 | $75.00 | $0.60 | $0.30 |
-| claude-sonnet-4-4/4-5 | $3.00 | $15.00 | $0.30 | $0.15 |
-| claude-haiku-4-4/4-5 | $0.80 | $4.00 | $0.10 | $0.05 |
-| gemini-2.5-pro/3-pro | $1.25 | $10.00 | $0.315 | $0.315 |
+| claude-opus-4-5/4-6 | $15.00 | $75.00 | $1.50 | $18.75 |
+| claude-sonnet-4-4/4-5/4-6 | $3.00 | $15.00 | $0.30 | $3.75 |
+| claude-haiku-4-4/4-5 | $0.80 | $4.00 | $0.08 | $1.00 |
+| gemini-2.5-pro | $1.25 | $10.00 | $0.32 | $0.32 |
+| gemini-3-pro/3-pro-preview | $2.00 | $12.00 | $0.20 | $0.20 |
+| gemini-3-flash-preview | $0.15 | $0.60 | $0.04 | $0.04 |
+| grok-code-fast-1 | $0.20 | $1.50 | $0.02 | $0.02 |
+| gpt-4o | $2.50 | $10.00 | $1.25 | $1.25 |
+| gpt-5 | $10.00 | $40.00 | $2.50 | $2.50 |
+| gpt-5.2 | $5.00 | $20.00 | $1.25 | $1.25 |
 
-Workers use the `github-copilot` provider which reports 0 for the `cost` field — costs are computed from token counts instead. Model names in the DB use dots (e.g., `claude-sonnet-4.5`); the pricing lookup normalizes to dashes.
+Internal models (`providerID: opencode`, e.g. `big-pickle`) are not priced — they report `$0` in cost output.
+
+Model names in the DB use dots (e.g., `claude-sonnet-4.5`); the pricing lookup normalizes dots to dashes for table key matching.

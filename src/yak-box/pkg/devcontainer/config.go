@@ -233,10 +233,10 @@ func LoadConfig(projectPath string) (*Config, error) {
 }
 
 // GetDefaultConfig returns the default devcontainer config
-// If defaultImage is empty, uses "yak-shaver:latest"
+// If defaultImage is empty, uses "yak-worker:latest"
 func GetDefaultConfig(defaultImage string) *Config {
 	if defaultImage == "" {
-		defaultImage = "yak-shaver:latest"
+		defaultImage = "yak-worker:latest"
 	}
 
 	return &Config{

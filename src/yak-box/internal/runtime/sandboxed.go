@@ -224,7 +224,7 @@ func StopSandboxedWorker(name string, timeout time.Duration) error {
 
 // ListRunningContainers returns list of running worker containers
 func ListRunningContainers() ([]string, error) {
-	cmd := exec.Command("docker", "ps", "--filter", "name=yak-shaver-", "--format", "{{.Names}}")
+	cmd := exec.Command("docker", "ps", "--filter", "name=yak-worker-", "--format", "{{.Names}}")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -241,7 +241,7 @@ func ListRunningContainers() ([]string, error) {
 
 // ListAllContainers returns list of all worker containers (running and stopped)
 func ListAllContainers() ([]string, error) {
-	cmd := exec.Command("docker", "ps", "-a", "--filter", "name=yak-shaver-", "--format", "{{.Names}}")
+	cmd := exec.Command("docker", "ps", "-a", "--filter", "name=yak-worker-", "--format", "{{.Names}}")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err

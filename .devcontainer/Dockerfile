@@ -54,6 +54,12 @@ RUN curl -fsSL https://opencode.ai/install | bash && \
 COPY bin/yx /usr/local/bin/yx
 RUN chmod +x /usr/local/bin/yx
 
+# Install RTK (context compression for AI agent tool output)
+# https://github.com/rtk-ai/rtk — reduces token consumption by 70-99%
+RUN curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh \
+    && mv /root/.local/bin/rtk /usr/local/bin/rtk \
+    && chmod +x /usr/local/bin/rtk
+
 # Trust any mounted workspace (container runs as root, repo owned by host user)
 RUN git config --global --add safe.directory '*'
 

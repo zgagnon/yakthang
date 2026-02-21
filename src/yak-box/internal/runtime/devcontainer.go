@@ -11,7 +11,7 @@ import (
 )
 
 const devcontainerPath = ".devcontainer"
-const workerImageName = "yak-shaver:latest"
+const workerImageName = "yak-worker:latest"
 
 func getStoredDevcontainerCommit() (string, error) {
 	cmd := exec.Command("docker", "image", "inspect", workerImageName, "--format", "{{index .Config.Labels \"yakthang.devcontainer.commit\"}}")
@@ -63,7 +63,7 @@ func isDevcontainerDirty(workspaceRoot string) (bool, error) {
 	return strings.TrimSpace(string(output)) != "", nil
 }
 
-// RebuildDevcontainer rebuilds the yak-shaver Docker image from the .devcontainer directory.
+// RebuildDevcontainer rebuilds the yak-worker Docker image from the .devcontainer directory.
 func RebuildDevcontainer() error {
 	workspaceRoot, err := workspace.FindRoot()
 	if err != nil {
@@ -75,7 +75,7 @@ func RebuildDevcontainer() error {
 		return fmt.Errorf("failed to get devcontainer commit: %w", err)
 	}
 
-	fmt.Println("Rebuilding yak-shaver image...")
+	fmt.Println("Rebuilding yak-worker image...")
 
 	cmd := exec.Command("docker", "build",
 		"-t", workerImageName,
@@ -136,14 +136,14 @@ func EnsureDevcontainer() error {
 
 	// Image doesn't exist
 	if !hasDevcontainer {
-		return fmt.Errorf("yak-shaver:latest image not found and no .devcontainer/Dockerfile to build from")
+		return fmt.Errorf("yak-worker:latest image not found and no .devcontainer/Dockerfile to build from")
 	}
 
-	fmt.Println("Building yak-shaver image for the first time...")
+	fmt.Println("Building yak-worker image for the first time...")
 	return RebuildDevcontainer()
 }
 
-// ImageExists checks if the yak-shaver Docker image exists locally
+// ImageExists checks if the yak-worker Docker image exists locally
 func ImageExists() (bool, error) {
 	cmd := exec.Command("docker", "image", "inspect", workerImageName)
 	err := cmd.Run()

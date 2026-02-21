@@ -65,8 +65,8 @@ func TestLoadConfigNonExistent(t *testing.T) {
 
 func TestGetDefaultConfig(t *testing.T) {
 	config := GetDefaultConfig("")
-	if config.Image != "yak-shaver:latest" {
-		t.Errorf("Expected default image yak-shaver:latest, got %s", config.Image)
+	if config.Image != "yak-worker:latest" {
+		t.Errorf("Expected default image yak-worker:latest, got %s", config.Image)
 	}
 
 	if config.RemoteUser != "root" {

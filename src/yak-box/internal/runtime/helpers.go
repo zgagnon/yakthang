@@ -114,7 +114,7 @@ func generateRunScript(cfg *spawnConfig, workspaceRoot, promptFile, innerScript,
 	sb.WriteString(fmt.Sprintf("\t-e YAK_PATH=\"%s\" \\\n", cfg.worker.YakPath))
 
 	// Devcontainer envs
-	imageName := "yak-shaver:latest"
+	imageName := "yak-worker:latest"
 	if cfg.devConfig != nil {
 		if cfg.devConfig.Image != "" {
 			imageName = cfg.devConfig.Image

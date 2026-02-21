@@ -19,17 +19,24 @@ go build -o /home/yakob/yakthang/bin/yak-box .
 
 ## DevContainer Support
 
-yak-box now supports reading `.devcontainer/devcontainer.json` configs when spawning workers.
+yak-box uses a unified `.devcontainer/Dockerfile` pattern for all worker images.
+
+**How it works:**
+1. Yakthang's `.devcontainer/Dockerfile` is the default worker image (`yak-worker:latest`)
+2. External projects can provide their own `.devcontainer/Dockerfile` to customize the image
+3. Projects without `.devcontainer/` fall back to yakthang's image
+4. The `devcontainer.json` config can override the image, env vars, and mounts
 
 When spawning a worker, yak-box will automatically:
-1. Look for `.devcontainer/devcontainer.json` in the working directory
-2. Parse the config and apply supported properties
-3. Override the default Docker image if specified
-4. Apply environment variables (containerEnv and remoteEnv)
-5. Mount additional volumes specified in the mounts array
+1. Build the `yak-worker:latest` image from yakthang's `.devcontainer/Dockerfile` if needed
+2. Look for `.devcontainer/devcontainer.json` in the working directory
+3. Parse the config and apply supported properties
+4. Override the default Docker image if specified
+5. Apply environment variables (containerEnv and remoteEnv)
+6. Mount additional volumes specified in the mounts array
 
 Supported devcontainer.json properties:
-- `image`: Override the default yak-shaver:latest image
+- `image`: Override the default yak-worker:latest image
 - `containerEnv`: Environment variables for the container
 - `remoteEnv`: Environment variables with variable substitution support
 - `mounts`: Additional Docker volume mounts

@@ -1,6 +1,6 @@
 ---
 name: yak-shaving-handbook
-description: The shaver's field guide. The complete operating guide for shavers in the yakthang environment. Covers task lifecycle (yx show, start, agent-status, done), message checking (yakob-message), heartbeat (yakob-heartbeat.sh), and notes for Yakob.
+description: The shaver's field guide. The complete operating guide for shavers in the yakthang environment. Covers task lifecycle (yx show, start, agent-status, done), message checking (yakob-message), heartbeat (via /loop), and notes for Yakob.
 ---
 
 # Yak Shaving Handbook
@@ -220,18 +220,17 @@ No external nudge is required — checking `yakob-message` is part of the shaver
 
 ## 3. Heartbeat
 
-If your tool supports **background tasks**, launch the heartbeat script so Yakob can stay aware of shaver activity:
+Heartbeat is **Yakob's responsibility**, not the shaver's. Shavers don't need to do anything for heartbeat.
 
-```bash
-# From the skill directory or workspace root; .yaks and timeout (seconds) are optional
-.claude/skills/yak-shaving-handbook/yakob-heartbeat.sh [.yaks] [300]
+Yakob uses `/loop` to schedule recurring status checks:
+
+```
+/loop 5m yx ls; yx field --show <id> agent-status
 ```
 
-- The script races **fswatch** (watching `.yaks/**/agent-status`) against a **5-minute timeout**.
-- If a shaver updates `agent-status`, it exits with the changed file path; Yakob can relaunch and react.
-- If 5 minutes pass with no changes, it exits with a prompt to check statuses.
-
-Run it in the background. When it exits, Yakob (or the orchestrator) relaunches it. One background task — no event log or state files.
+- `/loop` uses `CronCreate` under the hood — session-only, auto-expires after 3 days.
+- No external scripts, no fswatch dependency, no manual relaunching required.
+- Yakob relaunches the loop as needed; shavers just keep their `agent-status` updated.
 
 ---
 
@@ -247,7 +246,7 @@ Run it in the background. When it exits, Yakob (or the orchestrator) relaunches 
 | Claim a task | `yx start <id>` |
 | Report status | `echo "<status>" \| yx field <id> agent-status` |
 | Check for Yakob message | `yx field --show <id> yakob-message` |
-| Launch heartbeat (background) | `.claude/skills/yak-shaving-handbook/yakob-heartbeat.sh` |
+| Heartbeat (Yakob's responsibility) | `/loop 5m yx ls; yx field --show <id> agent-status` |
 | Update cost (if goccc available) | `goccc -days 0 -json 2>/dev/null \| jq -r '.summary.total_cost // "0"' \| yx field <id> spend` |
 | Leave notes for Yakob | `echo "..." \| yx field <id> comments.md` |
 | Add sub-task | `yx add child --under parent` |

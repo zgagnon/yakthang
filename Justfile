@@ -18,8 +18,8 @@ build-yak-box:
 build-yak-map:
     cd src/yak-map && cargo build --target wasm32-wasip1 --release
 
-# Build and install all tools to ~/.local/bin/
-install: install-yx install-yak-box
+# Build and install all tools
+install: install-yx install-yak-box install-yak-map
 
 # Build and install yx
 install-yx: build-yx
@@ -29,10 +29,10 @@ install-yx: build-yx
 install-yak-box: build-yak-box
     cp src/yak-box/yak-box ~/.local/bin/yak-box
 
-# Build yak-map WASM plugin (install is manual — copy to your Zellij plugin dir)
+# Build and install yak-map WASM plugin to shared Zellij plugin dir
 install-yak-map: build-yak-map
-    @echo "yak-map built at: src/yak-map/target/wasm32-wasip1/release/yak_map.wasm"
-    @echo "Install manually: cp src/yak-map/target/wasm32-wasip1/release/yak_map.wasm ~/.config/zellij/plugins/"
+    mkdir -p ~/.local/share/zellij/plugins
+    cp src/yak-map/target/wasm32-wasip1/release/yak_map.wasm ~/.local/share/zellij/plugins/yak-map.wasm
 
 # Clean all build artifacts
 clean:

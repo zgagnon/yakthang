@@ -2,7 +2,7 @@
 name = "yak_map"
 version = "0.1.0"
 edition = "2021"
-authors = ["Yakob <yakob@yakthang>"]
+authors = ["David Laing <david@davidlaing.com>"]
 
 [[bin]]
 name = "yak-map"

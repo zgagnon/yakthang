@@ -4,7 +4,7 @@ description: |
   Zellij plugin for visualizing yak task state.
   Displays the task tree from `yx ls` with assignment and status annotations.
 authors:
-  - Yakob <yakob@yakthang>
+  - David Laing <david@davidlaing.com>
 version: 0.1.0
 dir: target/wasm32-wasip1/debug/yak-map.wasm
 permissions:

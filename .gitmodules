@@ -1,0 +1,3 @@
+[submodule "src/yaks"]
+	path = src/yaks
+	url = https://github.com/mattwynne/yaks.git

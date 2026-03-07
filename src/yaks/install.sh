@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+set -e
+
+# Colors for output
+if [ -n "$NO_COLOR" ]; then
+  RED=''
+  GREEN=''
+  YELLOW=''
+  NC=''
+else
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  NC='\033[0m'
+fi
+
+# Checksums (updated by release workflow)
+CHECKSUM_LINUX_X86_64=""
+CHECKSUM_MACOS_AARCH64=""
+
+echo "Installing yx (yaks CLI)..."
+
+# Determine install location
+if [ -w "/usr/local/bin" ]; then
+    BIN_DIR="/usr/local/bin"
+elif [ -d "$HOME/.local/bin" ]; then
+    BIN_DIR="$HOME/.local/bin"
+else
+    mkdir -p "$HOME/.local/bin"
+    BIN_DIR="$HOME/.local/bin"
+fi
+
+# Detect user's shell
+DETECTED_SHELL=""
+if [[ "$SHELL" == *"zsh"* ]]; then
+    DETECTED_SHELL="zsh"
+elif [[ "$SHELL" == *"bash"* ]]; then
+    DETECTED_SHELL="bash"
+else
+    DETECTED_SHELL="bash"  # Default to bash
+fi
+
+# Prompt user to confirm or choose shell
+echo ""
+echo "Detected shell: $DETECTED_SHELL"
+echo "Install completions for:"
+echo "  1) zsh"
+echo "  2) bash"
+if [ "$DETECTED_SHELL" = "zsh" ]; then
+    DEFAULT_CHOICE="1"
+else
+    DEFAULT_CHOICE="2"
+fi
+if [ -n "$YX_SHELL_CHOICE" ]; then
+    SHELL_CHOICE="$YX_SHELL_CHOICE"
+else
+    read -r -p "Choice [$DEFAULT_CHOICE]: " SHELL_CHOICE </dev/tty
+    SHELL_CHOICE="${SHELL_CHOICE:-$DEFAULT_CHOICE}"
+fi
+
+if [ "$SHELL_CHOICE" = "1" ]; then
+    INSTALL_SHELL="zsh"
+else
+    INSTALL_SHELL="bash"
+fi
+
+# Determine completion location based on shell
+if [ "$INSTALL_SHELL" = "zsh" ]; then
+    COMPLETION_DIR="$HOME/.zsh/completions"
+    mkdir -p "$COMPLETION_DIR"
+    COMPLETION_FILE="yx.zsh"
+    SHELL_CONFIG="$HOME/.zshrc"
+else
+    if [ -d "/usr/local/etc/bash_completion.d" ] && [ -w "/usr/local/etc/bash_completion.d" ]; then
+        COMPLETION_DIR="/usr/local/etc/bash_completion.d"
+    else
+        COMPLETION_DIR="$HOME/.bash_completion.d"
+        mkdir -p "$COMPLETION_DIR"
+    fi
+    COMPLETION_FILE="yx.bash"
+    SHELL_CONFIG="$HOME/.bashrc"
+fi
+
+# Detect platform
+detect_platform() {
+    local os arch
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    arch="$(uname -m)"
+
+    case "$os" in
+        darwin) os="macos" ;;
+        linux) os="linux" ;;
+        *)
+            echo -e "${RED}Error: Unsupported OS: $os${NC}" >&2
+            exit 1
+            ;;
+    esac
+
+    case "$arch" in
+        x86_64|amd64) arch="x86_64" ;;
+        aarch64|arm64) arch="aarch64" ;;
+        *)
+            echo -e "${RED}Error: Unsupported architecture: $arch${NC}" >&2
+            exit 1
+            ;;
+    esac
+
+    echo "${os}-${arch}"
+}
+
+# Set up source and temp directory
+if [ -z "$YX_SOURCE" ]; then
+    PLATFORM=$(detect_platform)
+    SOURCE="https://github.com/mattwynne/yaks/releases/download/latest/yx-${PLATFORM}.zip"
+else
+    SOURCE="$YX_SOURCE"
+fi
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+echo "Downloading release..."
+
+# Download or copy zip file
+if [[ "$SOURCE" =~ ^https?:// ]]; then
+    # Download from URL
+    if ! curl -fsSL "$SOURCE" -o "$TEMP_DIR/yx.zip"; then
+        echo -e "${RED}Error: Failed to download from $SOURCE${NC}"
+        exit 1
+    fi
+else
+    # Copy local file
+    if [ ! -f "$SOURCE" ]; then
+        echo -e "${RED}Error: File not found: $SOURCE${NC}"
+        exit 1
+    fi
+    cp "$SOURCE" "$TEMP_DIR/yx.zip"
+fi
+
+# Verify checksum
+ACTUAL_SUM=$(shasum -a 256 "$TEMP_DIR/yx.zip" | cut -d' ' -f1)
+case "$PLATFORM" in
+  linux-x86_64)  EXPECTED="$CHECKSUM_LINUX_X86_64" ;;
+  macos-aarch64) EXPECTED="$CHECKSUM_MACOS_AARCH64" ;;
+  *)             EXPECTED="" ;;
+esac
+
+if [ -n "$EXPECTED" ]; then
+  if [ "$ACTUAL_SUM" != "$EXPECTED" ]; then
+    echo -e "${RED}Error: Checksum mismatch${NC}"
+    echo "  Expected: $EXPECTED"
+    echo "  Actual:   $ACTUAL_SUM"
+    exit 1
+  fi
+  echo "Checksum verified."
+fi
+
+# Extract zip to a subdirectory
+EXTRACT_DIR="$TEMP_DIR/extracted"
+if ! unzip -q "$TEMP_DIR/yx.zip" -d "$EXTRACT_DIR"; then
+    echo -e "${RED}Error: Failed to extract zip file${NC}"
+    exit 1
+fi
+
+# Verify expected structure
+if [ ! -f "$EXTRACT_DIR/bin/yx" ]; then
+    echo -e "${RED}Error: Invalid zip - bin/yx not found${NC}"
+    exit 1
+fi
+
+# Install to lib/yaks and symlink binary
+LIB_DIR="$(dirname "$BIN_DIR")/lib/yaks"
+mkdir -p "$LIB_DIR"
+cp -r "$EXTRACT_DIR/"* "$LIB_DIR/"
+ln -sf "$LIB_DIR/bin/yx" "$BIN_DIR/yx"
+
+# Install completion file
+if [ -f "$LIB_DIR/completions/$COMPLETION_FILE" ]; then
+    cp "$LIB_DIR/completions/$COMPLETION_FILE" "$COMPLETION_DIR/yx"
+fi
+
+echo -e "${GREEN}✓${NC} Installed yx to $LIB_DIR"
+echo -e "${GREEN}✓${NC} Linked $BIN_DIR/yx -> $LIB_DIR/bin/yx"
+echo -e "${GREEN}✓${NC} Installed completion to $COMPLETION_DIR/yx"
+
+# Check if completion is already sourced
+if [ -f "$SHELL_CONFIG" ]; then
+    if ! grep -q "source.*completions.*yx\|source.*yx" "$SHELL_CONFIG" 2>/dev/null; then
+        echo ""
+        echo -e "${YELLOW}To enable tab completion, add this to $SHELL_CONFIG:${NC}"
+        echo ""
+        echo "    source $COMPLETION_DIR/yx"
+        echo ""
+        if [ -n "$YX_AUTO_COMPLETE" ]; then
+            REPLY="$YX_AUTO_COMPLETE"
+        else
+            read -p "Add it now? [y/N] " -n 1 -r </dev/tty
+        fi
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            {
+                echo ""
+                echo "# yx completion"
+                echo "source $COMPLETION_DIR/yx"
+            } >> "$SHELL_CONFIG"
+            echo -e "${GREEN}✓${NC} Added completion to $SHELL_CONFIG"
+            echo "Restart your shell or run: source $SHELL_CONFIG"
+        fi
+    fi
+fi
+
+# Check PATH
+if ! echo "$PATH" | grep -q "$BIN_DIR"; then
+    echo ""
+    echo -e "${YELLOW}Warning: $BIN_DIR is not in your PATH${NC}"
+    echo "Add it to your shell config:"
+    echo "    export PATH=\"$BIN_DIR:\$PATH\""
+fi
+
+echo ""
+echo -e "${GREEN}Installation complete!${NC}"
+echo "Try: yx --help"

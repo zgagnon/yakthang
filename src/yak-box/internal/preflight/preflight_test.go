@@ -1,0 +1,195 @@
+package preflight_test
+
+import (
+	"bytes"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/wellmaintained/yak-box/internal/preflight"
+)
+
+func TestCheck_RequiredMissing(t *testing.T) {
+	deps := []preflight.Dep{
+		{Name: "this-binary-does-not-exist-99999", Required: true, Hint: "install it somehow"},
+	}
+	result := preflight.Check(deps)
+	if len(result.Missing) != 1 {
+		t.Fatalf("expected 1 missing dep, got %d", len(result.Missing))
+	}
+	if result.Missing[0].Name != "this-binary-does-not-exist-99999" {
+		t.Errorf("unexpected missing dep name: %s", result.Missing[0].Name)
+	}
+	if len(result.Warnings) != 0 {
+		t.Errorf("expected no warnings for required dep, got %v", result.Warnings)
+	}
+}
+
+func TestCheck_OptionalMissing(t *testing.T) {
+	deps := []preflight.Dep{
+		{Name: "this-binary-does-not-exist-99999", Required: false, Hint: "cost tracking will be disabled"},
+	}
+	result := preflight.Check(deps)
+	if len(result.Missing) != 0 {
+		t.Errorf("optional dep should not appear in Missing, got %v", result.Missing)
+	}
+	if len(result.Warnings) != 1 {
+		t.Fatalf("expected 1 warning for optional dep, got %d", len(result.Warnings))
+	}
+	if !strings.Contains(result.Warnings[0], "cost tracking will be disabled") {
+		t.Errorf("warning missing hint text: %s", result.Warnings[0])
+	}
+}
+
+func TestCheck_PresentBinary(t *testing.T) {
+	// "sh" is present on any Unix-like system used by this project.
+	deps := []preflight.Dep{
+		{Name: "sh", Required: true, Hint: "should never be missing"},
+	}
+	result := preflight.Check(deps)
+	if len(result.Missing) != 0 {
+		t.Errorf("sh should be present, got missing: %v", result.Missing)
+	}
+	if len(result.Warnings) != 0 {
+		t.Errorf("no warnings expected for present dep, got %v", result.Warnings)
+	}
+}
+
+func TestRun_RequiredMissingReturnsError(t *testing.T) {
+	deps := []preflight.Dep{
+		{Name: "this-binary-does-not-exist-99999", Required: true, Hint: "install it somehow"},
+	}
+	var buf bytes.Buffer
+	err := preflight.Run(deps, &buf)
+	if err == nil {
+		t.Fatal("expected error for missing required dep, got nil")
+	}
+	if !strings.Contains(err.Error(), "preflight check failed") {
+		t.Errorf("error message should mention preflight check failed: %v", err)
+	}
+	if !strings.Contains(err.Error(), "this-binary-does-not-exist-99999") {
+		t.Errorf("error message should name the missing binary: %v", err)
+	}
+}
+
+func TestRun_OptionalMissingWritesWarning(t *testing.T) {
+	deps := []preflight.Dep{
+		{Name: "this-binary-does-not-exist-99999", Required: false, Hint: "cost tracking will be disabled"},
+	}
+	var buf bytes.Buffer
+	err := preflight.Run(deps, &buf)
+	if err != nil {
+		t.Fatalf("optional missing dep should not return error, got: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Warning:") {
+		t.Errorf("expected Warning: in output, got: %q", out)
+	}
+}
+
+func TestRun_AllPresent(t *testing.T) {
+	deps := []preflight.Dep{
+		{Name: "sh", Required: true, Hint: "should never be missing"},
+	}
+	var buf bytes.Buffer
+	err := preflight.Run(deps, &buf)
+	if err != nil {
+		t.Fatalf("expected no error when all deps present, got: %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected no output when all deps present, got: %q", buf.String())
+	}
+}
+
+func TestSpawnNativeDeps_Claude(t *testing.T) {
+	deps := preflight.SpawnNativeDeps("claude")
+	names := depNames(deps)
+	requireContains(t, names, "zellij")
+	requireContains(t, names, "yx")
+	requireContains(t, names, "claude")
+	requireContains(t, names, "goccc")
+}
+
+func TestSpawnNativeDeps_Cursor(t *testing.T) {
+	deps := preflight.SpawnNativeDeps("cursor")
+	names := depNames(deps)
+	requireContains(t, names, "zellij")
+	requireContains(t, names, "yx")
+	requireContains(t, names, "agent")
+}
+
+func TestSpawnNativeDeps_Opencode(t *testing.T) {
+	deps := preflight.SpawnNativeDeps("opencode")
+	names := depNames(deps)
+	requireContains(t, names, "zellij")
+	requireContains(t, names, "yx")
+	requireContains(t, names, "opencode")
+}
+
+func TestSpawnSandboxedDeps(t *testing.T) {
+	deps := preflight.SpawnSandboxedDeps()
+	names := depNames(deps)
+	requireContains(t, names, "docker")
+	requireContains(t, names, "zellij")
+	requireContains(t, names, "yx")
+}
+
+func TestEnsureClaudeAuthEnv_ClaudeMissing(t *testing.T) {
+	err := preflight.EnsureClaudeAuthEnv("claude", func(string) (string, bool) {
+		return "", false
+	})
+	if err == nil {
+		t.Fatal("expected error when _ANTHROPIC_API_KEY is missing for claude")
+	}
+	if !strings.Contains(err.Error(), "_ANTHROPIC_API_KEY") {
+		t.Errorf("error should mention _ANTHROPIC_API_KEY, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "--tool claude") {
+		t.Errorf("error should mention --tool claude context, got: %v", err)
+	}
+}
+
+func TestEnsureClaudeAuthEnv_ClaudeEmpty(t *testing.T) {
+	err := preflight.EnsureClaudeAuthEnv("claude", func(string) (string, bool) {
+		return "   ", true
+	})
+	if err == nil {
+		t.Fatal("expected error when _ANTHROPIC_API_KEY is blank for claude")
+	}
+}
+
+func TestEnsureClaudeAuthEnv_ClaudePresent(t *testing.T) {
+	err := preflight.EnsureClaudeAuthEnv("claude", func(string) (string, bool) {
+		return "sk-ant-valid", true
+	})
+	if err != nil {
+		t.Fatalf("expected no error when _ANTHROPIC_API_KEY is set for claude, got: %v", err)
+	}
+}
+
+func TestEnsureClaudeAuthEnv_NonClaudeIgnored(t *testing.T) {
+	tools := []string{"cursor", "opencode"}
+	for _, tool := range tools {
+		err := preflight.EnsureClaudeAuthEnv(tool, func(string) (string, bool) {
+			return "", false
+		})
+		if err != nil {
+			t.Fatalf("expected no error for tool %q when _ANTHROPIC_API_KEY is missing, got: %v", tool, err)
+		}
+	}
+}
+
+func depNames(deps []preflight.Dep) []string {
+	names := make([]string, len(deps))
+	for i, d := range deps {
+		names[i] = d.Name
+	}
+	return names
+}
+
+func requireContains(t *testing.T, names []string, want string) {
+	t.Helper()
+	if !slices.Contains(names, want) {
+		t.Errorf("expected dep %q in list %v", want, names)
+	}
+}

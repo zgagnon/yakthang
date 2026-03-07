@@ -7,20 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPersonaCreation(t *testing.T) {
-	persona := Persona{
-		Name:        "TestPersona",
-		Emoji:       "🤖",
-		Trait:       "helpful",
-		Personality: "A test personality",
-	}
-
-	assert.Equal(t, "TestPersona", persona.Name)
-	assert.Equal(t, "🤖", persona.Emoji)
-	assert.Equal(t, "helpful", persona.Trait)
-	assert.Equal(t, "A test personality", persona.Personality)
-}
-
 func TestWorkerCreation(t *testing.T) {
 	now := time.Now()
 	worker := Worker{

@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use unicode_width::UnicodeWidthStr;
 use zellij_tile::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -26,6 +27,10 @@ impl Default for TaskRepository {
 impl TaskRepository {
     pub fn new(yaks_dir: PathBuf) -> Self {
         Self { yaks_dir }
+    }
+
+    pub fn yaks_dir(&self) -> &PathBuf {
+        &self.yaks_dir
     }
 
     pub fn list_tasks(&self) -> Vec<(String, usize)> {
@@ -64,23 +69,36 @@ impl TaskRepository {
             .filter(|s| !s.is_empty())
     }
 
+    /// Path to the context.md file for a task (may not exist yet).
+    pub fn context_path(&self, task_path: &str) -> PathBuf {
+        self.yaks_dir.join(task_path).join("context.md")
+    }
+
     pub fn get_task(&self, path: &str, depth: usize) -> TaskLine {
-        let state_str = self.get_field(path, "state");
+        let state_str = self.get_field(path, ".state");
         let state = match state_str.as_deref() {
             Some("wip") => TaskState::Wip,
             Some("done") => TaskState::Done,
             _ => TaskState::Todo,
         };
 
-        let name = path.split('/').last().unwrap_or(path).to_string();
+        let name = self
+            .get_field(path, ".name")
+            .unwrap_or_else(|| path.split('/').last().unwrap_or(path).to_string());
+
+        let yak_id = self
+            .get_field(path, ".id")
+            .unwrap_or_else(|| path.split('/').last().unwrap_or(path).to_string());
 
         TaskLine {
             path: path.to_string(),
             name,
+            yak_id,
             depth,
             state,
             assigned_to: self.get_field(path, "assigned-to"),
             agent_status: self.get_field(path, "agent-status"),
+            review_status: self.get_field(path, "review-status"),
             has_children: false,
             is_last_sibling: false,
             ancestor_continuations: Vec::new(),
@@ -93,17 +111,23 @@ struct State {
     repository: TaskRepository,
     tasks: Vec<TaskLine>,
     selected_index: usize,
+    scroll_offset: usize,
     error: Option<String>,
+    toast_message: Option<String>,
+    toast_ticks_remaining: u8,
+    pending_clipboard: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TaskLine {
     path: String,
     name: String,
+    yak_id: String,
     depth: usize,
     state: TaskState,
     assigned_to: Option<String>,
     agent_status: Option<String>,
+    review_status: Option<String>,
     has_children: bool,
     is_last_sibling: bool,
     ancestor_continuations: Vec<bool>,
@@ -114,15 +138,111 @@ impl Default for TaskLine {
         Self {
             path: String::new(),
             name: String::new(),
+            yak_id: String::new(),
             depth: 0,
             state: TaskState::Todo,
             assigned_to: None,
             agent_status: None,
+            review_status: None,
             has_children: false,
             is_last_sibling: false,
             ancestor_continuations: Vec::new(),
         }
     }
+}
+
+/// Map review-status field value to display emoji: 🔍 in-progress, ✅ pass, ❌ fail.
+/// Uses prefix matching (e.g. "pass: summary", "fail: missing tests") like agent-status.
+fn review_status_emoji(value: &str) -> Option<&'static str> {
+    let v = value.trim().to_lowercase();
+    if v.starts_with("in-progress") || v.starts_with("in_progress") {
+        Some("🔍")
+    } else if v.starts_with("pass") {
+        Some("✅")
+    } else if v.starts_with("fail") {
+        Some("❌")
+    } else {
+        None
+    }
+}
+
+/// Escape a string for use inside single-quoted shell literal (replace ' with '\'').
+fn escape_single_quoted(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        if c == '\'' {
+            out.push_str("'\\''");
+        } else {
+            out.push(c);
+        }
+    }
+    out.push('\'');
+    out
+}
+
+/// Write OSC 52 clipboard sequence to Zellij's outer terminal (the SSH PTY).
+/// Finds the Zellij client process (the one with a real PTY, not /dev/null) and
+/// writes to its fd/1 — the same TTY Zellij uses for copy-on-select.
+fn copy_via_zellij_tty(yx_name: &str) {
+    let encoded = base64_encode(yx_name.as_bytes());
+    // Zellij runs as two processes: a client (with the real TTY) and a server (/dev/null).
+    // pgrep finds both; we pick the one whose fd/1 is a character device (the PTY).
+    // base64 output is alphanumeric + +/= — safe to embed in shell without quoting.
+    let script = format!(
+        r#"for pid in $(pgrep -x zellij 2>/dev/null); do
+  tty=$(readlink -f /proc/$pid/fd/1 2>/dev/null)
+  if [ -c "$tty" ] && [ "$tty" != /dev/null ]; then
+    printf '\033]52;c;{enc}\007' > "$tty"
+    exit 0
+  fi
+done
+printf '\033]52;c;{enc}\007' > /dev/tty 2>/dev/null"#,
+        enc = encoded
+    );
+    run_command(&["sh", "-c", &script], BTreeMap::new());
+}
+
+/// Encode bytes as base64 (standard alphabet, with padding).
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as usize;
+        let b1 = if chunk.len() > 1 { chunk[1] as usize } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as usize } else { 0 };
+        out.push(CHARS[b0 >> 2] as char);
+        out.push(CHARS[((b0 & 3) << 4) | (b1 >> 4)] as char);
+        out.push(if chunk.len() > 1 { CHARS[((b1 & 0xf) << 2) | (b2 >> 6)] as char } else { '=' });
+        out.push(if chunk.len() > 2 { CHARS[b2 & 0x3f] as char } else { '=' });
+    }
+    out
+}
+
+/// Compute the display column width of a string that may contain ANSI escapes.
+/// Strips ANSI sequences first, then measures unicode display width.
+fn line_display_width(s: &str) -> usize {
+    strip_ansi(s).width()
+}
+
+/// Strip ANSI escape sequences (CSI sequences like \x1b[...m) from a string,
+/// returning only the visible characters.
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' && chars.peek() == Some(&'[') {
+            chars.next(); // consume '['
+            for inner in chars.by_ref() {
+                if inner.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
 }
 
 impl State {
@@ -260,12 +380,17 @@ impl State {
         let line_color = "\x1b[90m";
         let reset = "\x1b[0m";
 
-        // For depth >= 2, show continuation only for grandparent (index 1)
-        if task.depth >= 2 {
-            if let Some(&grandparent_cont) = task.ancestor_continuations.get(1) {
-                if grandparent_cont {
-                    prefix.push_str(&format!("{}│ {}", line_color, reset));
-                }
+        // Show continuation columns for each ancestor level (from root-most to parent).
+        // ancestor_continuations is ordered [parent, grandparent, ...], so we take
+        // the first depth-1 entries (excluding the root-most) and reverse them to
+        // render columns from left (root-most) to right (parent-most).
+        let col_count = task.depth.saturating_sub(1);
+        let cols = &task.ancestor_continuations[..col_count.min(task.ancestor_continuations.len())];
+        for &has_continuation in cols.iter().rev() {
+            if has_continuation {
+                prefix.push_str(&format!("{}│ {}", line_color, reset));
+            } else {
+                prefix.push_str("  ");
             }
         }
 
@@ -278,6 +403,12 @@ impl State {
         prefix
     }
 
+    fn highlight_line(&self, line: &str, padding: &str) -> String {
+        let bg = "\x1b[48;5;237m";
+        let highlighted = line.replace("\x1b[0m", &format!("\x1b[0m{bg}"));
+        format!("{bg}{}{}\x1b[0m", highlighted, padding)
+    }
+
     fn render_task(&self, task: &TaskLine) -> String {
         let prefix = self.tree_prefix(task);
         let status = self.status_symbol(task);
@@ -288,6 +419,18 @@ impl State {
             format!("\x1b[9m{}\x1b[0m", task.name)
         } else {
             task.name.clone()
+        };
+
+        let review_emoji = task
+            .review_status
+            .as_deref()
+            .and_then(review_status_emoji)
+            .unwrap_or("");
+
+        let review_suffix = if review_emoji.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", review_emoji)
         };
 
         let assignment = if let Some(agent) = &task.assigned_to {
@@ -303,9 +446,33 @@ impl State {
         };
 
         format!(
-            "{}{}{} {}{}\x1b[0m",
-            prefix, status_color, status, name, assignment
+            "{}{}{} {}{}{}\x1b[0m",
+            prefix, status_color, status, name, review_suffix, assignment
         )
+    }
+
+    /// Open the selected task in a floating pane via `yx show`.
+    fn open_selected_task_context(&self) {
+        let Some(task) = self.tasks.get(self.selected_index) else {
+            return;
+        };
+        let script = format!(
+            "COLUMNS=100 yx show {} | less -R; zellij action close-pane",
+            task.yak_id
+        );
+        let command = CommandToRun {
+            path: PathBuf::from("sh"),
+            args: vec!["-c".to_string(), script],
+            cwd: None,
+        };
+        let coords = FloatingPaneCoordinates::new(
+            None,
+            None,
+            Some("102".to_string()),
+            None,
+            None,
+        );
+        open_command_pane_floating(command, coords, BTreeMap::new());
     }
 }
 
@@ -313,6 +480,7 @@ impl ZellijPlugin for State {
     fn load(&mut self, configuration: BTreeMap<String, String>) {
         subscribe(&[EventType::Timer, EventType::Key]);
         set_timeout(2.0);
+        request_permission(&[PermissionType::OpenFiles, PermissionType::RunCommands]);
 
         let yaks_dir = PathBuf::from("/host/.yaks");
 
@@ -333,17 +501,23 @@ impl ZellijPlugin for State {
             Event::Timer(_) => {
                 set_timeout(2.0);
                 self.refresh_tasks();
+                if self.toast_ticks_remaining > 0 {
+                    self.toast_ticks_remaining -= 1;
+                    if self.toast_ticks_remaining == 0 {
+                        self.toast_message = None;
+                    }
+                }
                 true
             }
             Event::Key(key) => {
                 let handled = match key.bare_key {
-                    BareKey::Up if key.has_no_modifiers() => {
+                    BareKey::Up | BareKey::Char('k') if key.has_no_modifiers() => {
                         if self.selected_index > 0 {
                             self.selected_index -= 1;
                         }
                         true
                     }
-                    BareKey::Down if key.has_no_modifiers() => {
+                    BareKey::Down | BareKey::Char('j') if key.has_no_modifiers() => {
                         if self.selected_index + 1 < self.tasks.len() {
                             self.selected_index += 1;
                         }
@@ -351,6 +525,37 @@ impl ZellijPlugin for State {
                     }
                     BareKey::Char('r') if key.has_no_modifiers() => {
                         self.refresh_tasks();
+                        true
+                    }
+                    BareKey::Char('e') if key.has_no_modifiers() => {
+                        if let Some(task) = self.tasks.get(self.selected_index) {
+                            let context_path = self.repository.context_path(&task.path);
+                            if let Some(parent) = context_path.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
+                            if !context_path.exists() {
+                                let _ = std::fs::write(&context_path, "");
+                            }
+                            let host_path = context_path.strip_prefix("/host").unwrap_or(&context_path).to_path_buf();
+                            let file_to_open = FileToOpen::new(host_path);
+                            open_file_floating(file_to_open, None, BTreeMap::new());
+                        }
+                        true
+                    }
+                    BareKey::Char('y') if key.has_no_modifiers() => {
+                        if let Some(task) = self.tasks.get(self.selected_index) {
+                            // Try both paths: run_command writes directly to Zellij's outer
+                            // terminal (SSH PTY) via /proc; pending_clipboard emits OSC 52
+                            // in render() as a fallback via the plugin pane pipeline.
+                            copy_via_zellij_tty(&task.yak_id);
+                            self.pending_clipboard = Some(task.yak_id.clone());
+                            self.toast_message = Some(format!("Copied: {}", task.yak_id));
+                            self.toast_ticks_remaining = 1;
+                        }
+                        true
+                    }
+                    BareKey::Enter if key.has_no_modifiers() => {
+                        self.open_selected_task_context();
                         true
                     }
                     _ => false,
@@ -366,6 +571,8 @@ impl ZellijPlugin for State {
     }
 
     fn render(&mut self, rows: usize, cols: usize) {
+        let _ = self.pending_clipboard.take(); // consumed; clipboard written via copy_via_zellij_tty
+
         if let Some(error) = &self.error {
             println!("\x1b[31mError: {}\x1b[0m", error);
             return;
@@ -377,15 +584,32 @@ impl ZellijPlugin for State {
             return;
         }
 
-        let max_rows = rows.saturating_sub(3);
-        for (i, task) in self.tasks.iter().take(max_rows).enumerate() {
+        let toast_rows = if self.toast_message.is_some() { 2 } else { 0 };
+        let max_rows = rows.saturating_sub(3 + toast_rows);
+
+        // Keep scroll_offset in sync with selected_index
+        if self.selected_index < self.scroll_offset {
+            self.scroll_offset = self.selected_index;
+        } else if max_rows > 0 && self.selected_index >= self.scroll_offset + max_rows {
+            self.scroll_offset = self.selected_index - max_rows + 1;
+        }
+
+        for (i, task) in self.tasks.iter().skip(self.scroll_offset).take(max_rows).enumerate() {
             let line = self.render_task(task);
 
-            if i == self.selected_index {
-                println!("\x1b[7m{}\x1b[0m", line);
+            if self.scroll_offset + i == self.selected_index {
+                let visible_len = line_display_width(&line);
+                let padding = " ".repeat(cols.saturating_sub(visible_len));
+                println!("{}", self.highlight_line(&line, &padding));
             } else {
                 println!("{}", line);
             }
+        }
+
+        if let Some(msg) = &self.toast_message.clone() {
+            println!();
+            let toast = format!(" {} ", msg);
+            println!("\x1b[7m\x1b[1m{}\x1b[0m", toast);
         }
     }
 }
@@ -412,6 +636,29 @@ mod tests {
 
     fn set_field(yaks: &Path, task_path: &str, field: &str, value: &str) {
         fs::write(yaks.join(task_path).join(field), value).unwrap();
+    }
+
+    #[test]
+    fn get_task_uses_name_file_when_present() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "my-hyphenated-slug");
+        set_field(&yaks, "my-hyphenated-slug", ".name", "my hyphenated slug");
+
+        let repo = TaskRepository::new(yaks);
+        let task = repo.get_task("my-hyphenated-slug", 0);
+
+        assert_eq!(task.name, "my hyphenated slug");
+    }
+
+    #[test]
+    fn get_task_falls_back_to_slug_when_name_file_absent() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "my-hyphenated-slug");
+
+        let repo = TaskRepository::new(yaks);
+        let task = repo.get_task("my-hyphenated-slug", 0);
+
+        assert_eq!(task.name, "my-hyphenated-slug");
     }
 
     #[test]
@@ -506,9 +753,10 @@ mod tests {
     fn get_task_assembles_all_fields() {
         let (_temp, yaks) = mock_yaks();
         create_task(&yaks, "my-task");
-        set_field(&yaks, "my-task", "state", "wip");
+        set_field(&yaks, "my-task", ".state", "wip");
         set_field(&yaks, "my-task", "assigned-to", "bob");
         set_field(&yaks, "my-task", "agent-status", "wip: implementing");
+        set_field(&yaks, "my-task", "review-status", "pass");
 
         let repo = TaskRepository::new(yaks);
         let task = repo.get_task("my-task", 0);
@@ -518,6 +766,7 @@ mod tests {
         assert_eq!(task.state, TaskState::Wip);
         assert_eq!(task.assigned_to, Some("bob".to_string()));
         assert_eq!(task.agent_status, Some("wip: implementing".to_string()));
+        assert_eq!(task.review_status, Some("pass".to_string()));
     }
 
     #[test]
@@ -597,7 +846,7 @@ mod tests {
     fn handles_special_characters_in_task_name() {
         let (_temp, yaks) = mock_yaks();
         create_task(&yaks, "task-with-dashes_and_underscores");
-        set_field(&yaks, "task-with-dashes_and_underscores", "state", "done");
+        set_field(&yaks, "task-with-dashes_and_underscores", ".state", "done");
 
         let repo = TaskRepository::new(yaks);
         let task = repo.get_task("task-with-dashes_and_underscores", 0);
@@ -638,11 +887,11 @@ mod tests {
     }
 
     #[test]
-    fn tree_prefix_depth_2_with_sibling_has_continuation() {
+    fn tree_prefix_depth_2_parent_has_sibling_shows_continuation() {
         let (_temp, yaks) = mock_yaks();
-        // Create depth 2: grandparent "parent" has sibling at root
+        // parent "child" has sibling "child2" under "parent"
         create_task(&yaks, "parent/child/grandchild");
-        create_task(&yaks, "sibling");
+        create_task(&yaks, "parent/child2");
 
         let repo = TaskRepository::new(yaks.clone());
         let mut state = State {
@@ -652,7 +901,7 @@ mod tests {
         state.refresh_tasks();
 
         let grandchild = state.tasks.iter().find(|t| t.name == "grandchild").unwrap();
-        // grandparent "parent" has sibling "sibling" at root, so continuation shows
+        // parent "child" has sibling "child2", so continuation line shows
         let prefix = state.tree_prefix(grandchild);
         assert_eq!(prefix, "\x1b[90m│ \x1b[0m\x1b[90m╰─\x1b[0m");
     }
@@ -678,9 +927,9 @@ mod tests {
     }
 
     #[test]
-    fn tree_prefix_depth_2_no_continuation_when_parent_not_last() {
+    fn tree_prefix_depth_2_no_continuation_when_parent_is_last() {
         let (_temp, yaks) = mock_yaks();
-        // Create depth 2: grandparent has no sibling at root
+        // "child" is the only child of "parent", so no continuation column
         create_task(&yaks, "parent/child/grandchild");
 
         let repo = TaskRepository::new(yaks.clone());
@@ -691,16 +940,39 @@ mod tests {
         state.refresh_tasks();
 
         let grandchild = state.tasks.iter().find(|t| t.name == "grandchild").unwrap();
-        // grandparent "parent" has no sibling at root, so no continuation
+        // parent "child" has no siblings, so empty continuation column + connector
         let prefix = state.tree_prefix(grandchild);
-        assert_eq!(prefix, "\x1b[90m╰─\x1b[0m");
+        assert_eq!(prefix, "  \x1b[90m╰─\x1b[0m");
+    }
+
+    #[test]
+    fn tree_prefix_depth_3_shows_two_continuation_columns() {
+        let (_temp, yaks) = mock_yaks();
+        // a/b/c/d at depth 3; b has sibling b2, c has no sibling
+        create_task(&yaks, "a/b/c/d");
+        create_task(&yaks, "a/b2");
+
+        let repo = TaskRepository::new(yaks.clone());
+        let mut state = State {
+            repository: repo,
+            ..Default::default()
+        };
+        state.refresh_tasks();
+
+        let d = state.tasks.iter().find(|t| t.name == "d").unwrap();
+        // Columns: [grandparent b has siblings → │ ] [parent c has no siblings → "  "] then ╰─
+        let prefix = state.tree_prefix(d);
+        assert_eq!(
+            prefix,
+            "\x1b[90m│ \x1b[0m  \x1b[90m╰─\x1b[0m"
+        );
     }
 
     #[test]
     fn render_task_wip_shows_green_bullet() {
         let (_temp, yaks) = mock_yaks();
         create_task(&yaks, "my-task");
-        set_field(&yaks, "my-task", "state", "wip");
+        set_field(&yaks, "my-task", ".state", "wip");
 
         let repo = TaskRepository::new(yaks.clone());
         let mut state = State {
@@ -719,7 +991,7 @@ mod tests {
     fn render_task_done_shows_strikethrough() {
         let (_temp, yaks) = mock_yaks();
         create_task(&yaks, "my-task");
-        set_field(&yaks, "my-task", "state", "done");
+        set_field(&yaks, "my-task", ".state", "done");
 
         let repo = TaskRepository::new(yaks.clone());
         let mut state = State {
@@ -803,6 +1075,111 @@ mod tests {
     }
 
     #[test]
+    fn review_status_emoji_maps_correctly() {
+        assert_eq!(review_status_emoji("in-progress"), Some("🔍"));
+        assert_eq!(review_status_emoji("in_progress"), Some("🔍"));
+        assert_eq!(review_status_emoji("pass"), Some("✅"));
+        assert_eq!(review_status_emoji("fail"), Some("❌"));
+        assert_eq!(review_status_emoji("  PASS  "), Some("✅"));
+        assert_eq!(review_status_emoji("unknown"), None);
+        // Prefix matching (same pattern as agent-status)
+        assert_eq!(review_status_emoji("pass: summary"), Some("✅"));
+        assert_eq!(review_status_emoji("pass: looks good"), Some("✅"));
+        assert_eq!(review_status_emoji("fail: summary"), Some("❌"));
+        assert_eq!(review_status_emoji("fail: missing tests"), Some("❌"));
+    }
+
+    #[test]
+    fn render_task_with_review_status_shows_emoji() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "my-task");
+        set_field(&yaks, "my-task", "review-status", "pass");
+
+        let repo = TaskRepository::new(yaks.clone());
+        let mut state = State {
+            repository: repo,
+            ..Default::default()
+        };
+        state.refresh_tasks();
+
+        let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
+        let rendered = state.render_task(task);
+        assert!(rendered.contains("✅"), "pass should render ✅: {:?}", rendered);
+    }
+
+    #[test]
+    fn render_task_with_review_status_fail_shows_cross() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "my-task");
+        set_field(&yaks, "my-task", "review-status", "fail");
+
+        let repo = TaskRepository::new(yaks.clone());
+        let mut state = State {
+            repository: repo,
+            ..Default::default()
+        };
+        state.refresh_tasks();
+
+        let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
+        let rendered = state.render_task(task);
+        assert!(rendered.contains("❌"), "fail should render ❌: {:?}", rendered);
+    }
+
+    #[test]
+    fn render_task_with_review_status_in_progress_shows_magnifier() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "my-task");
+        set_field(&yaks, "my-task", "review-status", "in-progress");
+
+        let repo = TaskRepository::new(yaks.clone());
+        let mut state = State {
+            repository: repo,
+            ..Default::default()
+        };
+        state.refresh_tasks();
+
+        let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
+        let rendered = state.render_task(task);
+        assert!(rendered.contains("🔍"), "in-progress should render 🔍: {:?}", rendered);
+    }
+
+    #[test]
+    fn render_task_with_review_status_pass_looks_good_shows_check() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "my-task");
+        set_field(&yaks, "my-task", "review-status", "pass: looks good");
+
+        let repo = TaskRepository::new(yaks.clone());
+        let mut state = State {
+            repository: repo,
+            ..Default::default()
+        };
+        state.refresh_tasks();
+
+        let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
+        let rendered = state.render_task(task);
+        assert!(rendered.contains("✅"), "pass: looks good should render ✅: {:?}", rendered);
+    }
+
+    #[test]
+    fn render_task_with_review_status_fail_missing_tests_shows_cross() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "my-task");
+        set_field(&yaks, "my-task", "review-status", "fail: missing tests");
+
+        let repo = TaskRepository::new(yaks.clone());
+        let mut state = State {
+            repository: repo,
+            ..Default::default()
+        };
+        state.refresh_tasks();
+
+        let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
+        let rendered = state.render_task(task);
+        assert!(rendered.contains("❌"), "fail: missing tests should render ❌: {:?}", rendered);
+    }
+
+    #[test]
     fn refresh_tasks_handles_empty_directory() {
         let (_temp, yaks) = mock_yaks();
 
@@ -819,6 +1196,44 @@ mod tests {
     }
 
     #[test]
+    fn escape_single_quoted_empty() {
+        assert_eq!(escape_single_quoted(""), "''");
+    }
+
+    #[test]
+    fn escape_single_quoted_no_special() {
+        assert_eq!(escape_single_quoted("foo-bar"), "'foo-bar'");
+    }
+
+    #[test]
+    fn escape_single_quoted_with_single_quote() {
+        assert_eq!(escape_single_quoted("it's"), "'it'\\''s'");
+    }
+
+    #[test]
+    fn get_task_uses_id_file_when_present() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "parent/my-task");
+        set_field(&yaks, "parent/my-task", ".id", "my-task-a1b2");
+
+        let repo = TaskRepository::new(yaks);
+        let task = repo.get_task("parent/my-task", 1);
+
+        assert_eq!(task.yak_id, "my-task-a1b2");
+    }
+
+    #[test]
+    fn get_task_falls_back_to_leaf_slug_for_id_when_id_file_absent() {
+        let (_temp, yaks) = mock_yaks();
+        create_task(&yaks, "parent/my-task");
+
+        let repo = TaskRepository::new(yaks);
+        let task = repo.get_task("parent/my-task", 1);
+
+        assert_eq!(task.yak_id, "my-task");
+    }
+
+    #[test]
     fn refresh_tasks_selected_index_bounded() {
         let (_temp, yaks) = mock_yaks();
         create_task(&yaks, "task-a");
@@ -832,5 +1247,47 @@ mod tests {
         state.refresh_tasks();
 
         assert_eq!(state.selected_index, 0);
+    }
+
+    #[test]
+    fn highlight_line_uses_explicit_bg_not_reverse_video() {
+        let state = State::default();
+        let result = state.highlight_line("hello", "   ");
+        assert!(result.starts_with("\x1b[48;5;237m"), "should start with explicit bg: {:?}", result);
+        assert!(!result.contains("\x1b[7m"), "should not use reverse video: {:?}", result);
+        assert!(result.ends_with("\x1b[0m"), "should end with reset: {:?}", result);
+    }
+
+    #[test]
+    fn highlight_line_reestablishes_bg_after_reset() {
+        let state = State::default();
+        // A line that contains a reset mid-way (e.g. from colored text)
+        let line = "\x1b[32mfoo\x1b[0mbar";
+        let result = state.highlight_line(line, "");
+        // After each \x1b[0m the bg color should be re-established
+        assert!(result.contains("\x1b[0m\x1b[48;5;237m"), "bg not re-established after reset: {:?}", result);
+    }
+
+    #[test]
+    fn line_display_width_counts_emoji_as_two_columns() {
+        // 📋 is 2 display columns wide; chars().count() would return 1 for it
+        // "📋 foo" = 📋(2) + ' '(1) + 'f'(1) + 'o'(1) + 'o'(1) = 6 display cols
+        assert_eq!(line_display_width("📋 foo"), 6);
+        // with ANSI: stripped "📋 worklogs" = 📋(2) + ' '(1) + "worklogs"(8) = 11
+        assert_eq!(line_display_width("\x1b[33m📋 worklogs\x1b[0m"), 11);
+        // plain ASCII still works
+        assert_eq!(line_display_width("hello"), 5);
+    }
+
+    #[test]
+    fn highlight_line_padding_uses_same_bg() {
+        let state = State::default();
+        let result = state.highlight_line("hi", "     ");
+        // The bg is set at start before both the text and the padding
+        let bg = "\x1b[48;5;237m";
+        assert!(result.starts_with(bg));
+        // padding is inside the bg scope (before the final reset)
+        let reset_pos = result.rfind("\x1b[0m").unwrap();
+        assert!(reset_pos == result.len() - "\x1b[0m".len(), "final reset should be at end: {:?}", result);
     }
 }

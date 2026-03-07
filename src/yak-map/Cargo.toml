@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 zellij-tile = "0.43"
 serde = "1.0"
+unicode-width = "0.1"
 
 [dev-dependencies]
 tempfile = "3"

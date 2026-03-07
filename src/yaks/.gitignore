@@ -1,0 +1,43 @@
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# direnv
+.direnv
+
+# yaks data directory
+.yaks
+
+# verification marker for git hooks
+.last-checked
+
+# Claude Code
+!.claude/
+.claude/settings.local.json
+.claude/worktrees/
+
+# worktrees
+.worktrees
+
+# nix build artifacts
+result
+result-linux
+
+# ralph loop prompt
+prompt.md
+
+# pre-commit config (personal/local, generated from template)
+.pre-commit-config.yaml
+
+# Rust build artifacts
+target/
+
+# cargo-mutants output
+mutants.out/
+mutants.out.old/
+
+# pi agent config (allow prompts, ignore the rest)
+.pi/*
+!.pi/prompts/
+!.pi/extensions/

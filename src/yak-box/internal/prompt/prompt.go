@@ -1,18 +1,22 @@
+// Package prompt handles prompt generation and rendering for yak-box.
 package prompt
 
 import (
 	"fmt"
-
-	"github.com/yakthang/yakbox/pkg/types"
+	"strings"
 )
 
-// BuildPrompt assembles the initial prompt for a worker
-func BuildPrompt(persona types.Persona, mode string, yakPath string, userPrompt string, tasks []string) string {
+// BuildPrompt assembles the initial prompt for a worker.
+// shaverName is the identity of the shaver (persona in the prompt, e.g. "Yakoff"); skillNames are the skill folder basenames to reference.
+func BuildPrompt(mode string, yakPath string, userPrompt string, tasks []string, shaverName string, skillNames []string) string {
 	var roleDescription string
 	if mode == "plan" {
 		roleDescription = "Your supervisor is Yakob. The yaks are tasks — your job is to scout them and plan the shave. Do NOT pick up the clippers."
 	} else {
 		roleDescription = "Your supervisor is Yakob. The yaks are tasks — your job is to shave them clean."
+	}
+	if shaverName != "" {
+		roleDescription = "You are " + shaverName + ". " + roleDescription
 	}
 
 	var workflow string
@@ -75,9 +79,22 @@ TASK TRACKER (yx)`, taskList)
 TASK TRACKER (yx)`
 	}
 
-	return fmt.Sprintf(`%s
+	var skillSection string
+	if len(skillNames) > 0 {
+		var sb strings.Builder
+		sb.WriteString("\n---\nSKILLS\n\nYou have been given the following skills to guide your work:\n")
+		for _, name := range skillNames {
+			fmt.Fprintf(&sb, "  - %s\n", name)
+		}
+		sb.WriteString("\nBEFORE DOING ANYTHING ELSE — before reading context, before writing code, before any action:\n")
+		sb.WriteString("1. Invoke each skill listed above using the Skill tool (e.g. Skill(\"yx-task-management\")).\n")
+		sb.WriteString("2. Respond with: \"I have read the skills: [list them]. I understand my task. Beginning now.\"\n")
+		sb.WriteString("3. Only then begin work.\n")
+		sb.WriteString("\nThis is not optional. Skills contain your operating protocol.\n")
+		skillSection = sb.String()
+	}
 
-%s
+	return fmt.Sprintf(`%s
 
 %s
 
@@ -100,5 +117,9 @@ Reporting status (IMPORTANT -- the orchestrator monitors these fields):
   - When blocked:   echo "blocked: <reason>" | yx field <name> agent-status
   - When done:      echo "done: <summary>" | yx field <name> agent-status
 
-%s`, persona.Personality, roleDescription, userPrompt, taskAssignment, yakPath, workflow)
+Shortcut convention:
+  Move stories to Dev Finished (500001680) only.
+  Do not move stories to Done (500000571) or Not Doing (500000581).
+
+%s%s`, roleDescription, userPrompt, taskAssignment, yakPath, workflow, skillSection)
 }

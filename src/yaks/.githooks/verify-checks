@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Verifies that dev check has been run recently
+# Used by git hooks (pre-commit, pre-merge-commit, pre-push)
+
+set -e
+
+MARKER=".last-checked"
+
+# Check if marker file exists
+if [ ! -f "$MARKER" ]; then
+  echo "❌ You have un-verified changes. Run \`dev check\`"
+  exit 1
+fi
+
+# Check modified (unstaged) files — catches normal commits
+for file in $(git ls-files -m); do
+  if [ -f "$file" ] && [ "$file" -nt "$MARKER" ]; then
+    echo "❌ You have un-verified changes. Run \`dev check\`"
+    exit 1
+  fi
+done
+
+# Check staged files that differ from HEAD — catches merges
+# During pre-merge-commit, incoming changes are staged but not
+# yet committed, so git ls-files -m misses them entirely.
+for file in $(git diff --cached --name-only HEAD 2>/dev/null); do
+  if [ -f "$file" ] && [ "$file" -nt "$MARKER" ]; then
+    echo "❌ You have un-verified changes. Run \`dev check\`"
+    exit 1
+  fi
+done
+
+exit 0

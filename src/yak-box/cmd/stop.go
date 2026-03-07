@@ -3,12 +3,17 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/yakthang/yakbox/internal/metadata"
-	"github.com/yakthang/yakbox/internal/runtime"
+	"github.com/wellmaintained/yak-box/internal/errors"
+	"github.com/wellmaintained/yak-box/internal/preflight"
+	"github.com/wellmaintained/yak-box/internal/runtime"
+	"github.com/wellmaintained/yak-box/internal/sessions"
+	"github.com/wellmaintained/yak-box/internal/ui"
 )
 
 var (
@@ -24,12 +29,12 @@ var stopCmd = &cobra.Command{
 	Long: `Stop a running worker, optionally forcing termination.
 
 The stop command gracefully shuts down a worker by:
-1. Loading metadata from .yak-boxes/<worker-name>.meta
+1. Loading session from .yak-boxes/sessions.json
 2. Clearing task assignments (unless --force is set)
 3. Stopping the container or closing the Zellij tab
-4. Removing the container and deleting metadata
+4. Unregistering the session (home directory is preserved)
 
-If metadata is missing, the command attempts to detect the worker
+If session is missing, the command attempts to detect the worker
 via Docker ps or Zellij tabs as a fallback.`,
 	Example: `  # Gracefully stop a worker (clears task assignments)
   yak-box stop --name api-auth
@@ -42,25 +47,49 @@ via Docker ps or Zellij tabs as a fallback.`,
 
   # Stop with custom timeout
   yak-box stop --name backend-worker --timeout 60s`,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		var errs []error
+
+		// Validate required flags
+		if stopName == "" {
+			errs = append(errs, fmt.Errorf("--name is required (worker name to stop)"))
+		}
+
+		// Validate timeout format
+		if stopTimeout != "" {
+			if _, err := time.ParseDuration(stopTimeout); err != nil {
+				errs = append(errs, fmt.Errorf("--timeout has invalid format: %v (use '30s', '1m', '5m30s', etc.)", err))
+			}
+		}
+
+		if len(errs) > 0 {
+			return errors.CombineValidation(errs)
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := runStop(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			os.Exit(errors.GetExitCode(err))
 		}
 	},
 }
 
 func runStop() error {
-	fmt.Printf("Stopping worker: %s\n", stopName)
+	if err := preflight.Run(preflight.StopDeps(), os.Stderr); err != nil {
+		return err
+	}
+
+	ui.Info("⏳ Stopping worker: %s...\n", stopName)
 
 	timeout, err := time.ParseDuration(stopTimeout)
 	if err != nil {
-		return fmt.Errorf("invalid timeout: %w", err)
+		return errors.NewValidationError("invalid timeout format. Use a valid duration like '30s', '1m', or '5m30s'", err)
 	}
 
-	meta, err := metadata.LoadMetadata(stopName)
+	session, err := sessions.Get(stopName)
 	if err != nil {
-		fmt.Printf("Warning: Could not load metadata: %v\n", err)
+		fmt.Printf("Warning: Could not load session: %v\n", err)
 		fmt.Println("Attempting fallback detection...")
 
 		containerName := "yak-worker-" + stopName
@@ -68,66 +97,130 @@ func runStop() error {
 		if err == nil && len(workers) > 0 {
 			for _, w := range workers {
 				if w == containerName {
-					meta = &metadata.WorkerMetadata{
-						Runtime:       "sandboxed",
-						ContainerName: containerName,
+					session = &sessions.Session{
+						Runtime:     "sandboxed",
+						Container:   containerName,
+						DisplayName: stopName,
 					}
 					break
 				}
 			}
 		}
 
-		if meta == nil {
-			return fmt.Errorf("worker not found")
+		if session == nil {
+			return errors.NewValidationError("worker not found. Use 'docker ps' or 'zellij list-sessions' to find running workers, or check .yak-boxes/sessions.json", nil)
 		}
 	}
 
-	if !stopForce && len(meta.Tasks) > 0 {
-		fmt.Println("Clearing task assignments...")
-		for _, task := range meta.Tasks {
-			taskFile := filepath.Join(meta.YakPath, task, "assigned-to")
+	yakPath := ".yaks"
+	absYakPath, _ := filepath.Abs(yakPath)
+	var resolvedTaskDir string
+	if !stopForce && session.Task != "" {
+		taskDir, _, errResolve := resolveYakValue(absYakPath, session.Task)
+		if errResolve != nil {
+			fmt.Printf("Warning: Failed to find task directory for %s: %v\n", session.Task, errResolve)
+		} else {
+			resolvedTaskDir = taskDir
+		}
+	}
+	if !stopForce && session.Task != "" {
+		ui.Info("⏳ Clearing task assignments...\n")
+		if resolvedTaskDir != "" {
+			taskFile := filepath.Join(resolvedTaskDir, "assigned-to")
 			if err := os.Remove(taskFile); err != nil && !os.IsNotExist(err) {
-				fmt.Printf("Warning: Failed to clear assignment for %s: %v\n", task, err)
+				fmt.Printf("Warning: Failed to clear assignment for %s: %v\n", session.Task, err)
 			} else {
-				fmt.Printf("Cleared assignment: %s\n", task)
+				ui.Success("✅ Cleared assignment: %s\n", session.Task)
 			}
 		}
 	}
 
-	if meta.Runtime == "sandboxed" {
+	if !stopForce && session.Task != "" {
+		cost := extractWorkerCost(session)
+		if cost != "" {
+			ui.Info("💰 Session cost: %s\n", cost)
+			if resolvedTaskDir != "" {
+				spendFile := filepath.Join(resolvedTaskDir, "spend")
+				if err := os.WriteFile(spendFile, []byte(cost), 0644); err != nil {
+					fmt.Printf("Warning: Failed to write spend field: %v\n", err)
+				}
+			}
+		}
+	}
+
+	if session.Runtime == "sandboxed" {
 		if stopDryRun {
-			fmt.Printf("[dry-run] Would stop container: %s\n", meta.ContainerName)
-			fmt.Printf("[dry-run] Would close Zellij tab: %s\n", meta.DisplayName)
+			fmt.Printf("[dry-run] Would close Zellij tab: %s\n", session.DisplayName)
+			fmt.Printf("[dry-run] Would stop container: %s\n", session.Container)
 		} else {
-			fmt.Println("Stopping container...")
+			ui.Info("⏳ Closing Zellij tab...\n")
+			if err := runtime.StopNativeWorker(session.DisplayName, session.ZellijSession); err != nil {
+				fmt.Printf("Warning: failed to close tab: %v\n", err)
+			}
+			ui.Info("⏳ Stopping container...\n")
 			if err := runtime.StopSandboxedWorker(stopName, timeout); err != nil {
 				fmt.Printf("Warning: %v\n", err)
 			}
-			// Also close the Zellij tab (container runs inside the tab)
-			fmt.Println("Closing Zellij tab...")
-			if err := runtime.StopNativeWorker(meta.DisplayName, meta.ZellijSessionName); err != nil {
-				fmt.Printf("Warning: failed to close tab: %v\n", err)
-			}
 		}
-	} else if meta.Runtime == "native" {
+	} else if session.Runtime == "native" {
 		if stopDryRun {
-			fmt.Printf("[dry-run] Would close Zellij tab: %s\n", meta.DisplayName)
+			fmt.Printf("[dry-run] Would kill native process tree via PID file: %s\n", session.PidFile)
+			fmt.Printf("[dry-run] Would close Zellij tab: %s\n", session.DisplayName)
 		} else {
-			fmt.Println("Closing Zellij tab...")
-			if err := runtime.StopNativeWorker(meta.DisplayName, meta.ZellijSessionName); err != nil {
-				fmt.Printf("Warning: %v\n", err)
+			if session.PidFile != "" {
+				ui.Info("⏳ Killing native process tree...\n")
+				if err := runtime.KillNativeProcessTree(session.PidFile, timeout); err != nil {
+					fmt.Printf("Warning: failed to kill process tree: %v\n", err)
+				} else {
+					ui.Success("✅ Process tree terminated\n")
+				}
+			}
+			ui.Info("⏳ Closing Zellij tab...\n")
+			if err := runtime.StopNativeWorker(session.DisplayName, session.ZellijSession); err != nil {
+				fmt.Printf("Warning: failed to close tab: %v\n", err)
 			}
 		}
 	}
 
 	if !stopDryRun {
-		if err := metadata.DeleteMetadata(stopName); err != nil {
-			fmt.Printf("Warning: Failed to delete metadata: %v\n", err)
+		if err := sessions.Unregister(stopName); err != nil {
+			fmt.Printf("Warning: Failed to unregister session: %v\n", err)
 		}
 	}
 
-	fmt.Printf("Worker stopped: %s\n", stopName)
+	ui.Success("✅ Stopped: %s\n", stopName)
 	return nil
+}
+
+func extractWorkerCost(session *sessions.Session) string {
+	if session.Runtime == "sandboxed" {
+		cmd := exec.Command("docker", "exec", session.Container, "goccc", "-days", "0", "-json")
+		output, err := cmd.Output()
+		if err == nil {
+			jqCmd := exec.Command("docker", "exec", session.Container, "sh", "-c", "echo '"+string(output)+"' | jq -r '.summary.total_cost // \"0\"'")
+			costOutput, err := jqCmd.Output()
+			if err == nil {
+				cost := strings.TrimSpace(string(costOutput))
+				if cost != "0" && cost != "" {
+					return cost
+				}
+			}
+		}
+	} else if session.Runtime == "native" {
+		cmd := exec.Command("goccc", "-days", "0", "-json")
+		output, err := cmd.Output()
+		if err == nil {
+			jqCmd := exec.Command("sh", "-c", "echo '"+string(output)+"' | jq -r '.summary.total_cost // \"0\"'")
+			costOutput, err := jqCmd.Output()
+			if err == nil {
+				cost := strings.TrimSpace(string(costOutput))
+				if cost != "0" && cost != "" {
+					return cost
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func init() {

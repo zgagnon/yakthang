@@ -3586,6 +3586,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "tempfile",
+ "unicode-width",
  "zellij-tile",
 ]
 

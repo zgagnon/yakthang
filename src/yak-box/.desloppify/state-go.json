@@ -1,25 +1,32 @@
 {
   "version": 1,
   "created": "2026-03-08T12:24:24+00:00",
-  "last_scan": "2026-03-09T19:53:07+00:00",
-  "scan_count": 5,
-  "overall_score": 38.5,
+  "last_scan": "2026-03-09T20:01:55+00:00",
+  "scan_count": 6,
+  "overall_score": 70.6,
   "objective_score": 96.3,
-  "strict_score": 38.5,
+  "strict_score": 70.6,
   "verified_strict_score": 96.3,
   "stats": {
-    "total": 77,
-    "auto_resolved": 0,
+    "total": 145,
+    "auto_resolved": 1,
     "false_positive": 0,
     "fixed": 0,
-    "open": 77,
+    "open": 144,
     "wontfix": 0,
     "by_tier": {
+      "1": {
+        "auto_resolved": 0,
+        "false_positive": 0,
+        "fixed": 0,
+        "open": 51,
+        "wontfix": 0
+      },
       "2": {
         "auto_resolved": 0,
         "false_positive": 0,
         "fixed": 0,
-        "open": 34,
+        "open": 51,
         "wontfix": 0
       },
       "3": {
@@ -30,10 +37,10 @@
         "wontfix": 0
       },
       "4": {
-        "auto_resolved": 0,
+        "auto_resolved": 1,
         "false_positive": 0,
         "fixed": 0,
-        "open": 34,
+        "open": 33,
         "wontfix": 0
       }
     }
@@ -1033,17 +1040,23 @@
       "detail": {
         "reason": "unreviewed"
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "resolved by holistic review import",
       "first_seen": "2026-03-08T12:24:26+00:00",
       "last_seen": "2026-03-09T19:53:07+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-09T20:01:55+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "agent_import",
+        "text": "Holistic review refreshed; coverage marker superseded",
+        "attested_at": "2026-03-09T20:01:55+00:00",
+        "scan_verified": false
+      }
     },
     "golangci_lint::internal/env/filter_test.go::golangci_lint::159": {
       "id": "golangci_lint::internal/env/filter_test.go::golangci_lint::159",
@@ -1724,6 +1737,2242 @@
       "suppressed": false,
       "suppressed_at": null,
       "suppression_pattern": null
+    },
+    "review::.::holistic::high_level_elegance::hle_spawn_god_file::3b3ab06e": {
+      "id": "review::.::holistic::high_level_elegance::hle_spawn_god_file::3b3ab06e",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "cmd/spawn.go (730 LOC) conflates flag wiring, orchestration, and domain logic into one file, blurring cmd/ responsibility",
+      "detail": {
+        "holistic": true,
+        "dimension": "high_level_elegance",
+        "related_files": [
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "runSpawn() performs: runtime detection, preflight checks, yak-path resolution, worktree resolution and creation, skill copying, devcontainer loading, prompt assembly, worker struct construction, runtime dispatch, session registration, and task file writes \u2014 all inline.",
+          "Package-level flag vars (spawnCWD, spawnName, spawnSession, spawnMode, spawnResources, spawnYaks, spawnYakPath, spawnRuntime, spawnTool, spawnModel, spawnClean, spawnAutoWorktree, spawnSkills, spawnShaverName) are unencapsulated global state that makes the orchestration flow hard to trace.",
+          "Scan evidence: complexity_score 98.0, 730 LOC, signal density 4 issues from 3 detectors.",
+          "Helper functions resolveYakValue, readTaskDisplayPath, resolveInheritedWorktrees, findTaskDir, copySkillsToHome, findYakPath all live in spawn.go rather than dedicated internal packages."
+        ],
+        "suggestion": "Extract the resolution and orchestration logic into a dedicated internal/spawner or internal/spawn package with a typed SpawnRequest struct. cmd/spawn.go should only wire flags into SpawnRequest and call spawner.Run(ctx, req). Move yak resolution to internal/yaks, skill copying to internal/skills or an existing pkg.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::high_level_elegance::hle_helpers_naming::7368d063": {
+      "id": "review::.::holistic::high_level_elegance::hle_helpers_naming::7368d063",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "internal/runtime/helpers.go uses a generic 'helpers' name that obscures two distinct ownership areas",
+      "detail": {
+        "holistic": true,
+        "dimension": "high_level_elegance",
+        "related_files": [
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "helpers.go contains: generateInitScript (tool dispatch bash), generateWaitScript, generateRunScript (full docker run script assembly), resolveAnthropicKey, resolveAnthropicKeySuffix, buildClaudeJSONContent \u2014 script generation is one concern.",
+          "GetResourceProfile lives in sandboxed.go but resource profile lookup is unrelated to container lifecycle; it is about configuration values.",
+          "The file is 275 LOC and identified as an indirection hotspot with chain_count 29."
+        ],
+        "suggestion": "Rename helpers.go to scripts.go (or split into scripts.go for bash generation and auth_env.go for key resolution). This makes the ownership visible without opening the file.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::high_level_elegance::hle_config_unused_abstraction::9b94ba2f": {
+      "id": "review::.::holistic::high_level_elegance::hle_config_unused_abstraction::9b94ba2f",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "internal/config/config.go encapsulates workspace+YAK_PATH resolution but is bypassed by its primary consumer",
+      "detail": {
+        "holistic": true,
+        "dimension": "high_level_elegance",
+        "related_files": [
+          "internal/config/config.go",
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "internal/config/config.go exports LoadConfig() returning WorkspaceRoot, YakPath, MetadataDir.",
+          "cmd/spawn.go does not import internal/config; instead it re-implements YAK_PATH resolution: reads cmd flag, falls back to findYakPath(), resolves workspace root separately via filepath.Abs and internal/sessions.",
+          "The abstraction exists but does not reduce duplication \u2014 the primary consumer circumvents it."
+        ],
+        "suggestion": "Either wire cmd/spawn.go to call config.LoadConfig() as the first step and derive absYakPath from it, or delete internal/config/config.go and inline its two-liner into the one place that actually needs it.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::high_level_elegance::hle_devcontainer_naming_overlap::e51d1a06": {
+      "id": "review::.::holistic::high_level_elegance::hle_devcontainer_naming_overlap::e51d1a06",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "internal/runtime/devcontainer.go and pkg/devcontainer/ share a name and concern, creating navigability confusion",
+      "detail": {
+        "holistic": true,
+        "dimension": "high_level_elegance",
+        "related_files": [
+          "internal/runtime/devcontainer.go",
+          "pkg/devcontainer/config.go"
+        ],
+        "evidence": [
+          "pkg/devcontainer/ owns spec parsing and type modeling (Config, BuildConfig, LifecycleCommand, variables, security).",
+          "internal/runtime/devcontainer.go owns Docker image lifecycle (EnsureDevcontainer, RebuildDevcontainer, ImageExists, isImageUpToDate, getDevcontainerCommit).",
+          "Both directories answer 'devcontainer' when a new engineer asks 'where is devcontainer logic?' \u2014 two different answers with different responsibilities."
+        ],
+        "suggestion": "Rename internal/runtime/devcontainer.go to internal/runtime/image.go (or worker_image.go) to signal it owns 'the Docker worker image lifecycle' not 'devcontainer spec handling'. This makes the two concerns immediately distinguishable by file name.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::abstraction_fitness::spawn_domain_logic_in_cli::8de9a862": {
+      "id": "review::.::holistic::abstraction_fitness::spawn_domain_logic_in_cli::8de9a862",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "cmd/spawn.go embeds task resolution, skill copying, and session orchestration domain logic directly in the CLI layer with no domain abstractions",
+      "detail": {
+        "holistic": true,
+        "dimension": "abstraction_fitness",
+        "related_files": [
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "resolveYakValue (cmd/spawn.go:449-497) implements a 3-strategy task lookup (by .id file, by slug, by lowercase slug) entirely within the cmd package.",
+          "resolveInheritedWorktrees (cmd/spawn.go:563-620) traverses the .yaks directory tree walking up from a task to find a 'worktrees' field \u2014 this is domain logic for a task entity.",
+          "copySkillsToHome + copyDirRecursive + copyFile (cmd/spawn.go:622-707) implement recursive directory copying with symlink resolution in the cmd package.",
+          "findTaskDir (cmd/spawn.go:513-540) walks the .yaks tree searching for a directory by name \u2014 pure domain logic with no CLI concerns.",
+          "runSpawn itself is 264 lines (cmd/spawn.go:177-441) of sequential orchestration that cannot be independently tested without invoking the CLI layer.",
+          "cmd/spawn.go has complexity_score=98 and 730 LOC per mechanical scan."
+        ],
+        "suggestion": "Extract task resolution into internal/tasks package (resolveYakValue, findTaskDir, readTaskDisplayPath, resolveInheritedWorktrees). Extract skill management into internal/skills package (copySkillsToHome, copyDirRecursive, copyFile). This reduces cmd/spawn.go to CLI argument binding and orchestration, and makes domain logic independently testable.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::abstraction_fitness::config_unmarshal_alias_duplication::7868b969": {
+      "id": "review::.::holistic::abstraction_fitness::config_unmarshal_alias_duplication::7868b969",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "Config.UnmarshalJSON duplicates all 30+ struct fields in an Alias type and then copies them back field-by-field, imposing triple-site maintenance cost for every new Config field",
+      "detail": {
+        "holistic": true,
+        "dimension": "abstraction_fitness",
+        "related_files": [
+          "pkg/devcontainer/config.go"
+        ],
+        "evidence": [
+          "Alias struct (config.go:99-136) duplicates every field of Config except Entrypoint \u2014 28 fields repeated verbatim.",
+          "Manual field copy block (config.go:143-179) copies each field from aux back to c \u2014 28 assignments.",
+          "The only reason for the Alias is to handle the polymorphic 'entrypoint' field (string or []string). Adding a new Config field requires: (1) adding to Config, (2) adding to Alias, (3) adding to the copy block.",
+          "A raw map[string]json.RawMessage approach (already used for the entrypoint field at lines 182-201) could replace the Alias entirely: unmarshal via json.Unmarshal(data, (*struct without entrypoint tag)(c)) using a one-field override, eliminating the Alias and copy block."
+        ],
+        "suggestion": "Replace the Alias struct + copy block with a single-pass approach: define an inline struct with only the Entrypoint field overridden to json.RawMessage (using embedding of Config with entrypoint json:\"-\"), then handle entrypoint via the existing raw map logic. This eliminates the 3-site maintenance cost.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::abstraction_fitness::lifecycle_command_redundant_predicates::c4c7001c": {
+      "id": "review::.::holistic::abstraction_fitness::lifecycle_command_redundant_predicates::c4c7001c",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "LifecycleCommand exposes IsString/IsArray/IsObject predicate methods that duplicate the information already returned by AsString/AsArray/AsObject, adding API surface with no additional leverage",
+      "detail": {
+        "holistic": true,
+        "dimension": "abstraction_fitness",
+        "related_files": [
+          "pkg/devcontainer/lifecycle.go"
+        ],
+        "evidence": [
+          "IsString (lifecycle.go:85-88) performs the same type assertion as AsString and discards the result. Any caller who acts on IsString==true must then call AsString to obtain the value.",
+          "IsArray (lifecycle.go:91-94) and IsObject (lifecycle.go:97-100) have the same issue.",
+          "The As* methods already follow Go's ok-idiom (value, ok), making the Is* predicates redundant double-dispatch."
+        ],
+        "suggestion": "Remove IsString, IsArray, IsObject. Callers should use the ok-idiom of AsString/AsArray/AsObject directly: 'if s, ok := lc.AsString(); ok { ... }'. This reduces the public API surface of LifecycleCommand from 7 methods to 4.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::low_level_elegance::config_unmarshal_triple_duplication::7b4e2413": {
+      "id": "review::.::holistic::low_level_elegance::config_unmarshal_triple_duplication::7b4e2413",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "UnmarshalJSON in config.go duplicates Config's 30-field struct as Alias plus a manual field-copy block",
+      "detail": {
+        "holistic": true,
+        "dimension": "low_level_elegance",
+        "related_files": [
+          "pkg/devcontainer/config.go"
+        ],
+        "evidence": [
+          "Lines 99-136 define a local Alias struct that is a verbatim copy of Config minus Entrypoint.",
+          "Lines 144-179 manually assign every field from aux to c, one line per field, for ~36 assignment lines.",
+          "Lines 182-200 then do a second full json.Unmarshal into map[string]json.RawMessage to handle only the entrypoint field.",
+          "Any new Config field requires changes in three places: the struct definition, the Alias, and the copy block \u2014 an easy source of silent omissions."
+        ],
+        "suggestion": "Use a single unmarshal pass: unmarshal the full data into map[string]json.RawMessage, then use a type alias trick only for the entrypoint field. Alternatively, define the Alias once as `type configAlias Config` and embed it in the aux struct, then assign `*c = Config(aux.configAlias)` in one line rather than 36 individual assignments. This collapses the copy block to a single cast and ensures new fields are never forgotten.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::low_level_elegance::regex_recompile_in_hot_path::25448d81": {
+      "id": "review::.::holistic::low_level_elegance::regex_recompile_in_hot_path::25448d81",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "substituteString recompiles the same regexp on every call inside a ReplaceAllStringFunc callback",
+      "detail": {
+        "holistic": true,
+        "dimension": "low_level_elegance",
+        "related_files": [
+          "pkg/devcontainer/variables.go"
+        ],
+        "evidence": [
+          "Line 50: `re := regexp.MustCompile(`\\$\\{([^}]+)\\}`)` is inside substituteString.",
+          "substituteString is called recursively from Substitute (arrays/objects) and also from GetResolvedEnvironment for each env var value.",
+          "regexp.MustCompile is not free; calling it inside a function called in a loop compiles the pattern repeatedly instead of once."
+        ],
+        "suggestion": "Hoist the compiled regexp to a package-level var: `var substituteRe = regexp.MustCompile(`\\$\\{([^}]+)\\}`)`. Remove the local assignment inside substituteString. This is a one-line change that eliminates repeated compilation.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::low_level_elegance::generate_run_script_monolith::1d704759": {
+      "id": "review::.::holistic::low_level_elegance::generate_run_script_monolith::1d704759",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "generateRunScript is a 150-line function mixing host-path resolution, image selection, env var assembly, and docker flag generation",
+      "detail": {
+        "holistic": true,
+        "dimension": "low_level_elegance",
+        "related_files": [
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "Lines 86-238: single function body handles resolving hostGitConfigPath (twice via os.Stat), resolving imageName, building apiKeyNames exclusion map, iterating devcontainer mounts, resolving anthropic key, and streaming ~40 individual docker flags.",
+          "os.Stat(hostGitConfigPath) is called on line 135 and again on line 154 \u2014 the result is not cached between the two uses.",
+          "os.Stat(hostGHConfigDir) is similarly called twice (lines 139 and 157)."
+        ],
+        "suggestion": "Extract at minimum: (1) a helper that resolves host credential paths once and returns a struct with gitConfigPath/ghConfigDir (eliminating the duplicate Stat calls); (2) a helper that assembles and returns the devcontainer env lines. This would reduce generateRunScript to an orchestration sequence of ~60 lines.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::low_level_elegance::run_spawn_monolith::2d658e69": {
+      "id": "review::.::holistic::low_level_elegance::run_spawn_monolith::2d658e69",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "runSpawn in cmd/spawn.go is a 260-line function with four distinct phases and an inline type definition",
+      "detail": {
+        "holistic": true,
+        "dimension": "low_level_elegance",
+        "related_files": [
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "Lines 177-441: runSpawn handles preflight, path resolution, worktree management, devcontainer loading, prompt construction, worker struct construction, runtime dispatch, session registration, and task file writes.",
+          "Line 218: `type resolvedYak struct{ TaskDir, DisplayPath string }` is defined inline inside the function body \u2014 a pattern that signals the function has grown past a single coherent responsibility.",
+          "The function has seven distinct error-return paths before the runtime dispatch at line 377, each mixing different concerns."
+        ],
+        "suggestion": "Extract the pre-spawn setup into a `buildSpawnConfig(...)` function that returns a struct (cwd, worktreePath, devConfig, profile, prompt, worker) and an error. The main runSpawn becomes: validate \u2192 buildSpawnConfig \u2192 dispatch \u2192 register. The inline type resolvedYak should become a file-level type. This would cap runSpawn at ~60 lines.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::low_level_elegance::build_prompt_distant_format_args::4c94b9d1": {
+      "id": "review::.::holistic::low_level_elegance::build_prompt_distant_format_args::4c94b9d1",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "BuildPrompt uses a single fmt.Sprintf with 6 positional arguments whose verbs are 60+ lines from the argument list",
+      "detail": {
+        "holistic": true,
+        "dimension": "low_level_elegance",
+        "related_files": [
+          "internal/prompt/prompt.go"
+        ],
+        "evidence": [
+          "Lines 97-124: the format string spans ~27 lines with %s verbs; the argument list (roleDescription, userPrompt, taskAssignment, yakPath, workflow, skillSection) is at line 124, far from their corresponding verbs.",
+          "The ordering of arguments (roleDescription=1st, userPrompt=2nd, taskAssignment=3rd, yakPath=4th, workflow=5th, skillSection=6th) is not obvious from the format string without careful counting."
+        ],
+        "suggestion": "Replace the single Sprintf with a strings.Builder that appends each section sequentially with explicit labels, or use named format verbs. Either approach makes the assembly order self-documenting and eliminates the positional counting hazard.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::mid_level_elegance::spawn_orchestration_monolith::07cdd334": {
+      "id": "review::.::holistic::mid_level_elegance::spawn_orchestration_monolith::07cdd334",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "runSpawn() mixes 12+ concerns in a single 264-line function with no intermediate coordinators",
+      "detail": {
+        "holistic": true,
+        "dimension": "mid_level_elegance",
+        "related_files": [
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "runSpawn() (lines 177-441) sequentially handles: runtime detection, preflight, CWD resolution, yak path walk, worktree inheritance, auth validation, home dir setup, skill copy, devcontainer load, Worker struct assembly, name sanitization, sandboxed vs native dispatch, session registration, and task-file assignment.",
+          "The Worker struct is assembled inline at lines 359-375 after 180 lines of mixed domain logic and error handling, making it impossible to test the assembly logic independently.",
+          "The local resolvedYak struct type is declared inside the function body (line 218), reinforcing that the function is doing work that should be extracted to a named coordinator."
+        ],
+        "suggestion": "Extract a SpawnRequest value type that the CLI populates from flags, then pass it to a domain-level coordinator (e.g., internal/spawn or cmd-level spawnOrchestrator) that resolves paths, assembles the Worker, and calls runtime. The CLI's RunE should be 20-30 lines: parse flags, validate, delegate, report result.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::mid_level_elegance::auth_login_bypasses_runtime_layer::31fba2d0": {
+      "id": "review::.::holistic::mid_level_elegance::auth_login_bypasses_runtime_layer::31fba2d0",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "cmd/auth.go runAuthLogin() duplicates docker invocation logic that already exists in internal/runtime",
+      "detail": {
+        "holistic": true,
+        "dimension": "mid_level_elegance",
+        "related_files": [
+          "cmd/auth.go",
+          "internal/runtime/sandboxed.go",
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "cmd/auth.go lines 110-166 build /etc/passwd, /etc/group files and a full docker run args slice inline, identical in structure to the passwd/group generation in internal/runtime/sandboxed.go lines 158-169.",
+          "The docker run args slice in auth.go (lines 141-153) is hand-constructed in the cmd layer; the runtime layer owns generateRunScript() for the same purpose but is not called.",
+          "Two independently maintained code paths now own docker user-identity logic; a change to user mapping must be applied in both places."
+        ],
+        "suggestion": "Add a RunAuthLogin(shaverName, homeDir string) function in internal/runtime that centralises the docker identity setup and container invocation. The cmd layer should only collect the shaver name, resolve the home dir via sessions, and delegate.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::mid_level_elegance::generate_run_script_ambient_env_capture::f9bd5433": {
+      "id": "review::.::holistic::mid_level_elegance::generate_run_script_ambient_env_capture::f9bd5433",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "generateRunScript() in helpers.go reads os.Getenv(HOME) and os.Stat(gitconfig/gh-config) inside the function body rather than accepting them as parameters",
+      "detail": {
+        "holistic": true,
+        "dimension": "mid_level_elegance",
+        "related_files": [
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "Lines 132-141: homeDirHost := os.Getenv(\"HOME\"); hostGitConfigPath := filepath.Join(homeDirHost, \".gitconfig\"); hostGHConfigDir := filepath.Join(homeDirHost, \".config\", \"gh\") \u2014 all read from ambient environment inside the function.",
+          "Lines 154-160 repeat os.Stat checks on the same paths computed from ambient HOME.",
+          "The function signature func generateRunScript(cfg *spawnConfig, workspaceRoot, promptFile, innerScript, passwdFile, groupFile, networkMode string) string does not declare the host-home-dir dependency, so callers cannot predict or test what paths will be embedded in the generated script.",
+          "generateNativeWrapperScript in native.go (line 212) correctly accepts hostHomeDir as an explicit parameter \u2014 the two functions are inconsistent at the same boundary."
+        ],
+        "suggestion": "Add hostHomeDir string as an explicit parameter to generateRunScript(), parallel to generateNativeWrapperScript(). The caller (SpawnSandboxedWorker) already has access to os.Getenv(\"HOME\") and can pass it in, making the function pure with respect to its inputs.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::mid_level_elegance::check_double_docker_query::2ace33f3": {
+      "id": "review::.::holistic::mid_level_elegance::check_double_docker_query::2ace33f3",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "cmd/check.go calls runtime.ListRunningContainers() then immediately runs its own docker ps query on the same container set",
+      "detail": {
+        "holistic": true,
+        "dimension": "mid_level_elegance",
+        "related_files": [
+          "cmd/check.go"
+        ],
+        "evidence": [
+          "Line 155: containers, err := runtime.ListRunningContainers() \u2014 returns container names.",
+          "Lines 161-173: cmd := exec.Command(\"docker\", \"ps\", \"--filter\", \"name=yak-worker-\", \"--format\", \"{{.Names}}\\t{{.Status}}\\t{{.RunningFor}}\") \u2014 a second docker ps call for the same filter, parsed inline in the cmd layer.",
+          "The two calls are not guaranteed to return the same set (containers can stop between calls), and the status/uptime data from the second call is displayed without correlation to the containers from the first.",
+          "The docker output tab-splitting logic (lines 164-173) belongs to the runtime layer."
+        ],
+        "suggestion": "Add a ListRunningContainerDetails() function to internal/runtime that returns a struct with Name, Status, RunningFor fields. runCheck() can call it once and display the result, eliminating the double query and moving docker output parsing out of the cmd layer.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::mid_level_elegance::devcontainer_config_triple_field_maintenance::eace41ba": {
+      "id": "review::.::holistic::mid_level_elegance::devcontainer_config_triple_field_maintenance::eace41ba",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "Config.UnmarshalJSON in pkg/devcontainer/config.go duplicates the full field list in a local Alias struct and a manual field-copy block, creating a 3-way maintenance seam",
+      "detail": {
+        "holistic": true,
+        "dimension": "mid_level_elegance",
+        "related_files": [
+          "pkg/devcontainer/config.go"
+        ],
+        "evidence": [
+          "Config struct is defined at lines 43-94 (24 fields).",
+          "The local Alias struct inside UnmarshalJSON (lines 99-136) duplicates all 24 fields without the Entrypoint field.",
+          "Lines 143-179 manually copy every field from aux back to c \u2014 36 assignment lines.",
+          "Adding any new Config field requires edits in all three locations with no compile-time enforcement of consistency. The Entrypoint field was the only reason for this pattern, yet the entire struct is duplicated."
+        ],
+        "suggestion": "Use the standard Go embedding pattern: define an Alias type outside UnmarshalJSON as `type configAlias Config`, unmarshal into a struct that embeds *configAlias alongside a separate CacheFrom/Entrypoint field. This eliminates the manual copy block and reduces the seam to a single type alias.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::ai_generated_debt::restating_comments_errors_pkg::901dbca9": {
+      "id": "review::.::holistic::ai_generated_debt::restating_comments_errors_pkg::901dbca9",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "errors.go docstrings restate method names without adding insight on trivial 1-3 line functions",
+      "detail": {
+        "holistic": true,
+        "dimension": "ai_generated_debt",
+        "related_files": [
+          "internal/errors/errors.go"
+        ],
+        "evidence": [
+          "'// Error implements the error interface for ValidationError.' appears above func (e *ValidationError) Error() \u2014 the method name already communicates this.",
+          "'// Unwrap implements the error unwrapping interface for error chain inspection.' above Unwrap() \u2014 identical information already in the signature.",
+          "'// NewValidationError creates a new ValidationError with the given message and cause. Returns an error interface to support standard Go error handling.' on a 3-line constructor \u2014 the 'Returns an error interface to support standard Go error handling' sentence is noise; all constructors in Go work this way.",
+          "Comment ratio 0.33 \u2014 4.5x the codebase average of 0.073."
+        ],
+        "suggestion": "Drop or shorten the per-method comments on Error() and Unwrap() \u2014 the interface contract is self-evident from Go conventions. For NewValidationError/NewRuntimeError, keep only the non-obvious part: e.g. '// NewValidationError wraps msg and cause into exit-code-2 error.' Remove the 'Returns an error interface...' sentence from both constructors.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::ai_generated_debt::repeated_boilerplate_ui_output::347e6c4e": {
+      "id": "review::.::holistic::ai_generated_debt::repeated_boilerplate_ui_output::347e6c4e",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "ui/output.go copies the same docstring boilerplate verbatim across all four single-line color functions",
+      "detail": {
+        "holistic": true,
+        "dimension": "ai_generated_debt",
+        "related_files": [
+          "internal/ui/output.go"
+        ],
+        "evidence": [
+          "Success, Warning, Error, and Info each carry '// Respects NO_COLOR environment variable and TTY detection.' This sentence is identical across all four and adds nothing per-function since the entire package inherits this behavior from fatih/color.",
+          "Each docstring describes a one-line body; the color and target stream are already clear from the function name and the single Fprintf call."
+        ],
+        "suggestion": "Move 'Respects NO_COLOR environment variable and TTY detection.' to the package-level doc comment (already present on line 1-2) and remove the per-function repetition. Leave only a single-line distinction if needed, e.g. '// Success prints a green-colored message to stderr.' without the boilerplate sentence.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::ai_generated_debt::restating_comments_spawn_options::15e1e207": {
+      "id": "review::.::holistic::ai_generated_debt::restating_comments_spawn_options::15e1e207",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "options.go With* setter docstrings restate the function names on trivial 3-line closures",
+      "detail": {
+        "holistic": true,
+        "dimension": "ai_generated_debt",
+        "related_files": [
+          "internal/runtime/options.go"
+        ],
+        "evidence": [
+          "'// WithWorker sets the worker configuration' above WithWorker \u2014 name already communicates this.",
+          "'// WithPrompt sets the prompt string' above WithPrompt, '// WithResourceProfile sets the resource profile' above WithResourceProfile, '// WithHomeDir sets the home directory' above WithHomeDir, '// WithDevConfig sets the devcontainer configuration' above WithDevConfig \u2014 all follow the same restatement pattern.",
+          "Each function is a 3-line closure that assigns one field and returns nil; the comments add zero insight."
+        ],
+        "suggestion": "Remove the docstrings from all With* setters. If godoc coverage is needed for the exported API, a single-sentence package-level note pointing to SpawnOption is sufficient. WithCommander's comment '// WithCommander sets a custom commander for testing' is the only one worth keeping since it explains the non-obvious purpose (test injection).",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::package_organization::runtime_devcontainer_naming_collision::a96089a3": {
+      "id": "review::.::holistic::package_organization::runtime_devcontainer_naming_collision::a96089a3",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "internal/runtime/devcontainer.go name collides with pkg/devcontainer/ despite serving a different concern (yak-worker image lifecycle vs devcontainer spec parsing)",
+      "detail": {
+        "holistic": true,
+        "dimension": "package_organization",
+        "related_files": [
+          "internal/runtime/devcontainer.go",
+          "pkg/devcontainer/config.go",
+          "pkg/devcontainer/build.go"
+        ],
+        "evidence": [
+          "internal/runtime/devcontainer.go exports EnsureDevcontainer, RebuildDevcontainer, ImageExists \u2014 all about the yak-worker:latest Docker image lifecycle.",
+          "pkg/devcontainer/ exports Config, LoadConfig, BuildConfig, LifecycleCommand \u2014 about parsing/modelling the devcontainer.json spec.",
+          "Both are referenced from internal/runtime/sandboxed.go and cmd/spawn.go, forcing readers to mentally disambiguate two 'devcontainer' namespaces on every import scan."
+        ],
+        "suggestion": "Rename internal/runtime/devcontainer.go to internal/runtime/worker_image.go and rename the exported symbols accordingly (e.g. EnsureWorkerImage, RebuildWorkerImage). Staged plan: (1) mv internal/runtime/devcontainer.go internal/runtime/worker_image.go; (2) update package-internal references within internal/runtime/ (sandboxed.go calls EnsureDevcontainer, RebuildDevcontainer, ImageExists); (3) update cmd/ callers if any import these symbols directly; (4) run: go build ./... && go test ./... to confirm no broken references.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::package_organization::runtime_helpers_generic_name::f706cf34": {
+      "id": "review::.::holistic::package_organization::runtime_helpers_generic_name::f706cf34",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "internal/runtime/helpers.go uses a generic name for a file that exclusively generates sandboxed-worker shell scripts",
+      "detail": {
+        "holistic": true,
+        "dimension": "package_organization",
+        "related_files": [
+          "internal/runtime/helpers.go",
+          "internal/runtime/sandboxed.go"
+        ],
+        "evidence": [
+          "helpers.go contains generateInitScript, generateWaitScript, generateRunScript, resolveAnthropicKey, resolveAnthropicKeySuffix, buildClaudeJSONContent \u2014 all functions that produce shell script content or resolve Docker run arguments for the sandboxed spawn path.",
+          "None of these functions are used by native.go or other runtime sub-files; they are exclusively consumed by sandboxed.go.",
+          "'helpers.go' is a scan-time dead-end: a developer searching for 'how does the Docker run script get built?' must open helpers.go to discover its content rather than inferring from the name."
+        ],
+        "suggestion": "Rename internal/runtime/helpers.go to internal/runtime/sandboxed_scripts.go (or scripts.go within the sandboxed context). Staged plan: (1) mv internal/runtime/helpers.go internal/runtime/sandboxed_scripts.go; (2) no import changes needed (same package); (3) run: go build ./... && shellspec to verify.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::package_organization::pkg_vs_internal_boundary_blurred::9d08bfb4": {
+      "id": "review::.::holistic::package_organization::pkg_vs_internal_boundary_blurred::9d08bfb4",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "pkg/types and pkg/worktree place internal-only domain objects under pkg/, blurring the pkg/ vs internal/ navigability signal",
+      "detail": {
+        "holistic": true,
+        "dimension": "package_organization",
+        "related_files": [
+          "pkg/types/types.go",
+          "pkg/worktree/manager.go",
+          "pkg/devcontainer/config.go"
+        ],
+        "evidence": [
+          "pkg/types/types.go defines Worker and ResourceProfile \u2014 yak-box-specific runtime domain objects with no intended external consumer.",
+          "pkg/worktree/manager.go defines git worktree management operations (EnsureWorktree, CreateWorktree, DetermineWorktreePath) that are application-internal orchestration steps.",
+          "pkg/devcontainer/ is a legitimate pkg/ candidate: it models the vendor-neutral devcontainer.json spec and could be imported by other tools.",
+          "Go convention: internal/ = not importable outside the module; pkg/ = intended for external import. Placing Worker and worktree ops in pkg/ sends a false signal that these are stable external APIs."
+        ],
+        "suggestion": "Move pkg/types/ to internal/types/ and pkg/worktree/ to internal/worktree/. Staged plan: (1) mkdir internal/types internal/worktree; (2) mv pkg/types/types.go internal/types/types.go, mv pkg/worktree/manager.go internal/worktree/manager.go (and test files); (3) update import paths in all consumers \u2014 run: grep -r 'yak-box/pkg/types' --include='*.go' -l and grep -r 'yak-box/pkg/worktree' --include='*.go' -l to enumerate; (4) run: go build ./... && go test ./... to confirm.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::package_organization::slugify_task_path_misplaced::a34db28c": {
+      "id": "review::.::holistic::package_organization::slugify_task_path_misplaced::a34db28c",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "SlugifyTaskPath string utility lives in pkg/types alongside domain type definitions with no logical cohesion",
+      "detail": {
+        "holistic": true,
+        "dimension": "package_organization",
+        "related_files": [
+          "pkg/types/types.go",
+          "internal/pathutil/validate.go"
+        ],
+        "evidence": [
+          "SlugifyTaskPath in pkg/types/types.go performs filepath slug conversion (replace spaces with dashes, handle path separators). It has no dependency on Worker or ResourceProfile \u2014 the other two types in the file.",
+          "internal/pathutil/ already exists for path-related utilities (validate.go). SlugifyTaskPath is a natural fit for that package.",
+          "Keeping it in pkg/types/ means a developer looking for path utilities must know to check the types package."
+        ],
+        "suggestion": "Move SlugifyTaskPath to internal/pathutil/slugify.go (or append to validate.go if the function is small). Staged plan: (1) add SlugifyTaskPath to internal/pathutil/; (2) update import in consumers (grep -r 'SlugifyTaskPath' --include='*.go' -l); (3) remove from pkg/types/types.go; (4) run: go build ./... && go test ./...",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::initialization_coupling::sentinel_error_identity::5e9a9049": {
+      "id": "review::.::holistic::initialization_coupling::sentinel_error_identity::5e9a9049",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "ErrSessionNotFound uses fmt.Errorf instead of errors.New, making errors.Is identity checks unreliable",
+      "detail": {
+        "holistic": true,
+        "dimension": "initialization_coupling",
+        "related_files": [
+          "internal/sessions/sessions.go"
+        ],
+        "evidence": [
+          "Line 22: var ErrSessionNotFound = fmt.Errorf(\"session not found\") \u2014 fmt.Errorf returns a new value each call but here is assigned once at import time.",
+          "Go sentinel error convention is errors.New() to establish pointer identity; fmt.Errorf is intended for formatted messages, not fixed sentinel values.",
+          "If any caller wraps and then unwraps with errors.Is(err, ErrSessionNotFound), the pointer identity test will fail because the wrapped error's target won't match a fmt.Errorf-produced value in the standard errors.Is chain unless explicitly implemented.",
+          "No current callers in the reviewed files use errors.Is, but the public API exposes ErrSessionNotFound, making future misuse plausible."
+        ],
+        "suggestion": "Replace `var ErrSessionNotFound = fmt.Errorf(\"session not found\")` with `var ErrSessionNotFound = errors.New(\"session not found\")` and add `\"errors\"` to the import block. This is a single-line change that brings the sentinel in line with Go convention and makes it safe for errors.Is usage.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::design_coherence::runSpawn_multi_responsibility::74519543": {
+      "id": "review::.::holistic::design_coherence::runSpawn_multi_responsibility::74519543",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "runSpawn handles 7+ distinct concerns in one 264-line body",
+      "detail": {
+        "holistic": true,
+        "dimension": "design_coherence",
+        "related_files": [
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "Lines 178-441: single function performs runtime detection, yak/task resolution (resolveYakValue loop), worktree management (EnsureWorktree, EnsureWorktreeAtPath), shaver home setup (CleanHome, EnsureHomeDir), auth check (EnsureClaudeAuthEnv), skill copying (copySkillsToHome), devcontainer loading (devcontainer.LoadConfig), worker struct construction, runtime dispatch (SpawnSandboxedWorker / SpawnNativeWorker), session registration, and file writes for assigned-to and worktree-path.",
+          "The runtime dispatch block (lines 377-404) is buried inside the same function body that also resolves paths, leaving the two runtimes' distinct behaviours invisible to a reader scanning for spawn mechanics."
+        ],
+        "suggestion": "Extract at minimum: (1) resolveSpawnContext(flags) -> SpawnContext that handles all path/task/worktree resolution and returns a struct; (2) setupWorkerHome(shaverName, tool, skills) -> (homeDir, error); (3) dispatchWorker(ctx, worker, prompt, runtime) -> error. runSpawn becomes a coordinator of ~40 lines that calls these in sequence.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::design_coherence::cost_extraction_duplication::78cdc0ba": {
+      "id": "review::.::holistic::design_coherence::cost_extraction_duplication::78cdc0ba",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "extractWorkerCost (stop.go) and getContainerCost (check.go) duplicate goccc+jq shell logic",
+      "detail": {
+        "holistic": true,
+        "dimension": "design_coherence",
+        "related_files": [
+          "cmd/stop.go",
+          "cmd/check.go"
+        ],
+        "evidence": [
+          "stop.go lines 196-223: runs 'docker exec <container> goccc -days 0 -json', then pipes through jq via 'echo \\''+string(output)+\"\\' | jq -r '.summary.total_cost // \\\"0\\\"'\". Handles sandboxed and native branches.",
+          "check.go lines 209-233: runs identical goccc + jq sequence inside getContainerCost, same shell-injection construction, same result parsing.",
+          "The echo-string-injection pattern is duplicated verbatim in both files, creating two maintenance points for the same fragile construction."
+        ],
+        "suggestion": "Move the shared logic into a new function in internal/sessions or internal/runtime, e.g. 'FetchWorkerCost(runtime, containerName string) string'. Both stop.go and check.go call this function. The jq shell-injection risk is also contained in one place where it can be replaced with a proper JSON parse.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::design_coherence::zellij_session_flag_repetition::1a762b1b": {
+      "id": "review::.::holistic::design_coherence::zellij_session_flag_repetition::1a762b1b",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "Identical zellij --session conditional repeated 4+ times across native.go instead of a helper",
+      "detail": {
+        "holistic": true,
+        "dimension": "design_coherence",
+        "related_files": [
+          "internal/runtime/native.go"
+        ],
+        "evidence": [
+          "SpawnNativeWorker lines 60-64: 'if zellijSession != \"\" { exec.Command(\"zellij\", \"--session\", zellijSession, ...) } else { exec.Command(\"zellij\", ...) }'",
+          "StopNativeWorker lines 85-91: same pattern for the script-based path",
+          "StopNativeWorker lines 104-111: same pattern again for go-to-tab and close-tab commands",
+          "findZellijTabIndex lines 128-132: same session-conditional pattern for query-tab-names"
+        ],
+        "suggestion": "Introduce a package-private helper 'zellijCmd(session string, args ...string) *exec.Cmd' that prepends '--session', session when session is non-empty. All four call sites reduce to a single call with no conditional. This also makes the intent of the session argument visible at every call site.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::design_coherence::generateNativeWrapperScript_mixed_dispatch::e50da2ae": {
+      "id": "review::.::holistic::design_coherence::generateNativeWrapperScript_mixed_dispatch::e50da2ae",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "generateNativeWrapperScript both dispatches per-tool and constructs the script, mixing two responsibilities",
+      "detail": {
+        "holistic": true,
+        "dimension": "design_coherence",
+        "related_files": [
+          "internal/runtime/native.go"
+        ],
+        "evidence": [
+          "Function signature (line 212): takes 6 positional parameters (worker, homeDir, hostHomeDir, promptFile, pidFile, apiKey) and returns (content, paneName string).",
+          "The function body has three fully independent case branches (claude, cursor, opencode) that each build a complete bash script with no shared structure \u2014 they could be separate functions.",
+          "The claude branch (lines 236-269) also embeds macOS Keychain management logic (security create-keychain, set-default-keychain, trap) that is unrelated to script generation."
+        ],
+        "suggestion": "Split into per-tool generators: generateClaudeWrapperScript, generateCursorWrapperScript, generateOpencodeWrapperScript, each taking only the parameters they need. generateNativeWrapperScript becomes a thin dispatcher that selects the right generator. This also makes the macOS keychain logic visible as a distinct concern inside generateClaudeWrapperScript.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::design_coherence::stop_repeated_guard_clause::d0bb85f4": {
+      "id": "review::.::holistic::design_coherence::stop_repeated_guard_clause::d0bb85f4",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "cmd/stop.go checks '!stopForce && session.Task != \"\"' three times in sequence for unrelated side effects",
+      "detail": {
+        "holistic": true,
+        "dimension": "design_coherence",
+        "related_files": [
+          "cmd/stop.go"
+        ],
+        "evidence": [
+          "Lines 118-125: guard check #1 \u2014 resolves task directory",
+          "Lines 126-136: guard check #2 \u2014 clears assigned-to file",
+          "Lines 138-149: guard check #3 \u2014 extracts cost and writes spend file",
+          "All three blocks share the identical condition but perform unrelated operations; if the condition changes (e.g. a new flag), all three must be updated in sync."
+        ],
+        "suggestion": "Hoist the guard into a single block: 'if !stopForce && session.Task != \"\" { resolvedTaskDir = ...; clearTaskAssignment(resolvedTaskDir, session.Task); writeSpendFile(resolvedTaskDir, session) }'. The three operations become sequential calls inside one conditional scope, with clear extracted functions for each side effect.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::contract_coherence::get_resolved_env_mutates_ctx::47403771": {
+      "id": "review::.::holistic::contract_coherence::get_resolved_env_mutates_ctx::47403771",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "GetResolvedEnvironment mutates its SubstituteContext argument \u2014 side effect hidden behind getter name",
+      "detail": {
+        "holistic": true,
+        "dimension": "contract_coherence",
+        "related_files": [
+          "pkg/devcontainer/config.go"
+        ],
+        "evidence": [
+          "Line 303-304: ctx.ContainerEnv[k] = resolved \u2014 the function writes into the caller-supplied context during its 'first pass' over containerEnv, so every call mutates the ctx argument in place",
+          "The doc comment says 'applies variable substitution and returns resolved environment variables' with no mention of mutation",
+          "Named GetResolvedEnvironment, implying a read/compute operation with no side effects on input"
+        ],
+        "suggestion": "Either rename to ApplyAndResolveEnvironment (or ResolveEnvironment) and document the mutation contract explicitly in the doc comment, or change the implementation to build a local ContainerEnv map rather than writing into ctx.ContainerEnv, making the function truly side-effect-free relative to its input.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::contract_coherence::config_parsed_but_ignored_fields::a1ab6061": {
+      "id": "review::.::holistic::contract_coherence::config_parsed_but_ignored_fields::a1ab6061",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "Config struct documents many fields as parsed-but-not-applied, silently dropping caller-supplied devcontainer settings",
+      "detail": {
+        "holistic": true,
+        "dimension": "contract_coherence",
+        "related_files": [
+          "pkg/devcontainer/config.go",
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "Config struct doc (line 39-43) lists RunArgs, Privileged, CapAdd, SecurityOpt, ContainerUser, WorkspaceMount, and all lifecycle commands as 'parsed but not applied'",
+          "generateRunScript (internal/runtime/helpers.go:86-238) uses only cfg.devConfig.Image, cfg.devConfig.Mounts, and cfg.devConfig.GetResolvedEnvironment \u2014 all other Config fields are silently discarded",
+          "A caller who sets devcontainer.json with Privileged: true or capAdd: [SYS_PTRACE] will see those fields populated in the returned Config but have no effect at spawn time \u2014 no warning is emitted for these fields"
+        ],
+        "suggestion": "Emit a SecurityWarning (the return type already supports this) or a ui.Warning at LoadConfig time for each parsed-but-ignored field that has a non-zero value in the devcontainer.json, so callers are informed rather than silently misled. Alternatively, strip the unparsed fields from Config and use a smaller ParsedConfig type that only contains the fields yak-box actually honors.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::contract_coherence::resolve_anthropic_key_suffix_unused::79e96e92": {
+      "id": "review::.::holistic::contract_coherence::resolve_anthropic_key_suffix_unused::79e96e92",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "resolveAnthropicKeySuffix has a documented contract but is dead code \u2014 nothing calls it",
+      "detail": {
+        "holistic": true,
+        "dimension": "contract_coherence",
+        "related_files": [
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "Lines 254-262: resolveAnthropicKeySuffix has a doc comment explaining it returns 'the last 20 characters of the Anthropic API key, which is how Claude Code identifies approved custom API keys'",
+          "golangci_lint reports: 'func resolveAnthropicKeySuffix is unused'",
+          "buildClaudeJSONContent (line 267) takes an apiKeySuffix parameter and is called by callers in auth.go \u2014 but nothing passes the result of resolveAnthropicKeySuffix to it"
+        ],
+        "suggestion": "Either wire resolveAnthropicKeySuffix into the call site where buildClaudeJSONContent is invoked (likely in internal/runtime/auth.go's setupClaudeSettings), or delete the function if the API key pre-approval feature has been removed. The current state breaks the documented contract: the comment says it exists to pre-approve API keys but no caller uses it for that purpose.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::logic_clarity::opencode_agent_arg_wrong_var::c7fe7a50": {
+      "id": "review::.::holistic::logic_clarity::opencode_agent_arg_wrong_var::c7fe7a50",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "generateInitScript opencode branch passes literal 'build' as --agent instead of $AGENT_NAME",
+      "detail": {
+        "holistic": true,
+        "dimension": "logic_clarity",
+        "related_files": [
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "Line 45 of the embedded bash: 'opencode --prompt \"$PROMPT\" --agent \"$1\"'",
+          "The script is always invoked as 'bash /opt/worker/start.sh build' (helpers.go line 235), so $1 is always the string 'build'",
+          "AGENT_NAME is defined on line 22 of the generated bash ('AGENT_NAME=\"${YAK_AGENT_NAME:-}\"') but is never referenced in the opencode branch"
+        ],
+        "suggestion": "Replace '--agent \"$1\"' with '--agent \"$AGENT_NAME\"' in the opencode case of generateInitScript. Add a test that verifies the generated script uses $AGENT_NAME, not $1.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::logic_clarity::devcontainer_id_dead_return::7daeec26": {
+      "id": "review::.::holistic::logic_clarity::devcontainer_id_dead_return::7daeec26",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "generateDevContainerID has unreachable 'return encoded' \u2014 always-true len guard makes the else path dead code",
+      "detail": {
+        "holistic": true,
+        "dimension": "logic_clarity",
+        "related_files": [
+          "pkg/devcontainer/variables.go"
+        ],
+        "evidence": [
+          "SHA-256 hash is 32 bytes; base32.StdEncoding.EncodeToString(32-byte slice) always produces 56 characters (including padding)",
+          "Lines 134-138: 'if len(encoded) > 52 { return encoded[:52] }; return encoded' \u2014 the else branch is never reached because 56 > 52 is always true",
+          "Comment says '52 chars' but base32 of 32 bytes is 56 chars with StdEncoding padding"
+        ],
+        "suggestion": "Remove the len check and always return encoded[:52], or switch to base32.StdEncoding.WithPadding(base32.NoPadding) and verify the resulting length is exactly 52 before slicing.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::logic_clarity::generate_run_script_redundant_stat::77dcc5ef": {
+      "id": "review::.::holistic::logic_clarity::generate_run_script_redundant_stat::77dcc5ef",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "generateRunScript calls os.Stat twice for hostGitConfigPath and twice for hostGHConfigDir with no mutation between calls",
+      "detail": {
+        "holistic": true,
+        "dimension": "logic_clarity",
+        "related_files": [
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "os.Stat(hostGitConfigPath) called at line 135 (for -v mount) and again at line 154 (for -e env var)",
+          "os.Stat(hostGHConfigDir) called at line 139 (for -v mount) and again at line 157 (for -e env var)",
+          "No modification to the filesystem or variables between the first and second call in each pair"
+        ],
+        "suggestion": "Capture the stat result in a boolean variable (e.g. gitConfigExists) before the mount block and reuse it in the env var block to eliminate the redundant syscalls and make the coupling between the two conditional blocks explicit.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::type_safety::ts_01_raw_string_domain_types::7f2603a6": {
+      "id": "review::.::holistic::type_safety::ts_01_raw_string_domain_types::7f2603a6",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "Runtime, Tool, and Mode domain values are untyped strings with scattered raw comparisons",
+      "detail": {
+        "holistic": true,
+        "dimension": "type_safety",
+        "related_files": [
+          "pkg/types/types.go",
+          "cmd/spawn.go",
+          "internal/runtime/native.go",
+          "internal/runtime/helpers.go",
+          "internal/runtime/sandboxed.go",
+          "internal/prompt/prompt.go"
+        ],
+        "evidence": [
+          "Worker.Runtime is string; compared as 'sandboxed'/'native' across at least 4 files with no shared constant set.",
+          "Worker.Tool is string; switch statements on 'claude'/'opencode'/'cursor' appear in native.go, helpers.go, and spawn.go independently.",
+          "spawnMode ('plan'/'build') is a plain string compared with == in prompt.go and spawn.go with no shared constant.",
+          "PreRunE in spawn.go validates spawnRuntime, spawnTool, spawnMode at CLI boundary but the types themselves carry no constraint inside the system."
+        ],
+        "suggestion": "Define type aliases (type RuntimeKind string, type ToolKind string) with const blocks for valid values in pkg/types/types.go. Update Worker struct fields and all comparison sites to use these types. This converts runtime misspellings into compile-time errors.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::type_safety::ts_02_security_severity_untyped::fc657719": {
+      "id": "review::.::holistic::type_safety::ts_02_security_severity_untyped::fc657719",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "SecurityWarning.Severity is an unconstrained string with magic values 'warning' and 'critical'",
+      "detail": {
+        "holistic": true,
+        "dimension": "type_safety",
+        "related_files": [
+          "pkg/devcontainer/security.go"
+        ],
+        "evidence": [
+          "SecurityWarning struct defines Severity as string with comment '\"warning\" or \"critical\"'.",
+          "All call sites in security.go hardcode the literal strings 'critical' and 'warning' inline.",
+          "No constant or type alias guards against misspelling or addition of new severity levels."
+        ],
+        "suggestion": "Define type SecuritySeverity string with constants SecuritySeverityWarning and SecuritySeverityCritical. Change SecurityWarning.Severity to SecuritySeverity.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::type_safety::ts_03_detect_runtime_unknown_hidden::23a0dbd1": {
+      "id": "review::.::holistic::type_safety::ts_03_detect_runtime_unknown_hidden::23a0dbd1",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "DetectRuntime() returns a three-valued string ('sandboxed'/'native'/'unknown') with no type signal for the error case",
+      "detail": {
+        "holistic": true,
+        "dimension": "type_safety",
+        "related_files": [
+          "internal/runtime/sandboxed.go",
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "DetectRuntime() (sandboxed.go:82) returns 'unknown' when neither Docker nor Zellij is available.",
+          "The return type 'string' gives callers no indication that a third sentinel value exists; they must read the implementation or documentation.",
+          "cmd/spawn.go handles 'unknown' (line 182) but only because the author knew to check \u2014 future callers may not."
+        ],
+        "suggestion": "Return (RuntimeKind, error) from DetectRuntime so the failure case is explicit in the signature. Alternatively, define RuntimeKind with an Unknown zero value and document it as the error sentinel. Either approach removes the hidden contract.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::type_safety::ts_04_forward_ports_interface_slice::6dd074ef": {
+      "id": "review::.::holistic::type_safety::ts_04_forward_ports_interface_slice::6dd074ef",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "Config.ForwardPorts is []interface{} with no typed accessor, losing type safety for callers",
+      "detail": {
+        "holistic": true,
+        "dimension": "type_safety",
+        "related_files": [
+          "pkg/devcontainer/config.go"
+        ],
+        "evidence": [
+          "ForwardPorts []interface{} comment says 'int or string' but no typed sum type or accessor method encapsulates this.",
+          "LifecycleCommand (lifecycle.go) demonstrates the codebase already knows how to create typed wrappers for polymorphic JSON \u2014 ForwardPorts does not follow this pattern.",
+          "Callers who iterate ForwardPorts must perform unguarded type assertions with no compile-time aid."
+        ],
+        "suggestion": "Introduce a ForwardPort type (similar to LifecycleCommand) with AsInt/AsString accessors, or at minimum add a GetForwardPorts() []ForwardPort method. This is consistent with how LifecycleCommand already handles polymorphic fields.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::naming_quality::getter_name_hides_io::fa44cea1": {
+      "id": "review::.::holistic::naming_quality::getter_name_hides_io::fa44cea1",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "getContainerCost uses a getter prefix but executes up to two docker exec processes",
+      "detail": {
+        "holistic": true,
+        "dimension": "naming_quality",
+        "related_files": [
+          "cmd/check.go"
+        ],
+        "evidence": [
+          "getContainerCost (cmd/check.go:209) executes exec.Command(\"docker\", \"exec\", container, \"opencode\", \"stats\") and on failure a second docker exec call to goccc+jq \u2014 two subprocess forks behind a name that reads as a simple accessor.",
+          "The codebase's own Get* exported functions (GetResourceProfile, GetNetworkMode, GetDockerfile, GetPortAttributes) are all cheap: map lookups, field reads, or at most a single exec for network inspection. getContainerCost is an outlier that violates this convention."
+        ],
+        "suggestion": "Rename to fetchContainerCost or queryContainerCost to signal I/O. Alternatively prefix with run* or collect* to match the verb convention used elsewhere for functions with side effects.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::naming_quality::worker_name_vs_workername_ambiguity::01ca7f2a": {
+      "id": "review::.::holistic::naming_quality::worker_name_vs_workername_ambiguity::01ca7f2a",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "types.Worker.Name and types.Worker.WorkerName both hold the user-supplied worker name with no distinguishable semantic from naming alone",
+      "detail": {
+        "holistic": true,
+        "dimension": "naming_quality",
+        "related_files": [
+          "cmd/spawn.go",
+          "pkg/types/types.go"
+        ],
+        "evidence": [
+          "cmd/spawn.go line 264-265: workerName := strings.TrimSpace(spawnName); then line 359: Name: spawnName, WorkerName: workerName \u2014 both resolve to the same string (spawnName with possible leading/trailing space stripped).",
+          "The struct carries both Name and WorkerName with no comment distinguishing their roles. Callers reading the struct cannot determine from naming alone which field is the 'canonical' identity vs the 'display' identity."
+        ],
+        "suggestion": "If the distinction is sanitization (WorkerName is the sanitized/slug form), rename to SanitizedName or SlugName. If Name is internal and WorkerName is the user-facing label, reverse the naming. Add a comment to the struct field explaining the difference.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::naming_quality::generateNativeWrapperScript_dead_return::2883da8f": {
+      "id": "review::.::holistic::naming_quality::generateNativeWrapperScript_dead_return::2883da8f",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "generateNativeWrapperScript returns (content, paneName) but all callers discard paneName",
+      "detail": {
+        "holistic": true,
+        "dimension": "naming_quality",
+        "related_files": [
+          "internal/runtime/native.go"
+        ],
+        "evidence": [
+          "internal/runtime/native.go line 45: wrapperContent, _ = generateNativeWrapperScript(...) \u2014 paneName is discarded with blank identifier.",
+          "The function signature advertises a paneName return value and sets it inside each switch case (paneName = \"claude (build) [native]\"), but no caller uses it. The name implies the value matters; the usage pattern says it does not."
+        ],
+        "suggestion": "If paneName is never used, remove it from the return signature to eliminate the misleading promise. If it should be used (e.g., to set the Zellij pane label), wire it up in SpawnNativeWorker.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::naming_quality::hasoauthcreds_vocabulary_divergence::35fd4e26": {
+      "id": "review::.::holistic::naming_quality::hasoauthcreds_vocabulary_divergence::35fd4e26",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "hasOAuthCreds (preflight) and hasOAuthCredentials (runtime/auth) implement identical logic under different names",
+      "detail": {
+        "holistic": true,
+        "dimension": "naming_quality",
+        "related_files": [
+          "internal/preflight/preflight.go",
+          "internal/runtime/auth.go"
+        ],
+        "evidence": [
+          "internal/preflight/preflight.go:174: func hasOAuthCreds(homeDir string) bool \u2014 checks for non-empty JSON in homeDir/.claude/",
+          "internal/runtime/auth.go:44: func hasOAuthCredentials(shaverHomeDir string) bool \u2014 identical logic, different parameter name (homeDir vs shaverHomeDir) and different function name (Creds vs Credentials).",
+          "Both are private helpers so they cannot be deduplicated via a shared package reference without an architectural change, but the vocabulary divergence signals that the two authors did not agree on the canonical name."
+        ],
+        "suggestion": "Standardize on one name (hasOAuthCredentials is more explicit; hasCreds is dangerously terse). If duplication is intentional (package boundary discipline), at minimum align the name to one spelling across packages.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::error_consistency::auth_cmd_bypasses_typed_errors::922a6ec2": {
+      "id": "review::.::holistic::error_consistency::auth_cmd_bypasses_typed_errors::922a6ec2",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "cmd/auth.go uses only bare fmt.Errorf, bypassing the typed error system used by all sibling commands",
+      "detail": {
+        "holistic": true,
+        "dimension": "error_consistency",
+        "related_files": [
+          "cmd/auth.go",
+          "internal/errors/errors.go"
+        ],
+        "evidence": [
+          "cmd/auth.go:49 returns fmt.Errorf('failed to resolve home dir for shaver %q: %w', ...) \u2014 never wraps in errors.NewRuntimeError",
+          "cmd/auth.go:103 returns fmt.Errorf('--shaver is required') \u2014 not errors.NewValidationError",
+          "cmd/auth.go:161 returns fmt.Errorf('auth login failed: %w...') \u2014 bare fmt.Errorf",
+          "sibling commands (spawn, stop, check, message) all use errors.GetExitCode and errors.CombineValidation; auth does not"
+        ],
+        "suggestion": "Wrap validation failures (missing --shaver) in errors.NewValidationError and runtime failures (docker not found, auth login failed) in errors.NewRuntimeError; add errors.GetExitCode dispatch in the Run handler as done in sibling commands",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::error_consistency::spawn_native_silences_setup_errors::e3584c5c": {
+      "id": "review::.::holistic::error_consistency::spawn_native_silences_setup_errors::e3584c5c",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "SpawnNativeWorker silences two meaningful setup errors as warnings rather than aborting the spawn",
+      "detail": {
+        "holistic": true,
+        "dimension": "error_consistency",
+        "related_files": [
+          "internal/runtime/native.go"
+        ],
+        "evidence": [
+          "native.go line 39-41: if err := setupClaudeSettings(...); err != nil { fmt.Fprintf(os.Stderr, 'Warning: failed to setup Claude settings: %v', err) } \u2014 error not returned, spawn continues",
+          "native.go line 45: wrapperContent, _ := generateNativeWrapperScript(...) \u2014 second return value (error) silently discarded with blank identifier",
+          "native.go inside setupClaudeSettings line 334: fmt.Fprintf(os.Stderr, 'Warning: failed to write .claude.json: %v', err) \u2014 file write error not returned to caller",
+          "These failures will cause the spawned worker to start without proper Claude auth configuration, producing confusing runtime failures inside the container rather than a clear error at spawn time"
+        ],
+        "suggestion": "Return errors from setupClaudeSettings call in SpawnNativeWorker instead of printing a warning; fix generateNativeWrapperScript to return an error if it can fail, and check it; promote the .claude.json write failure in setupClaudeSettings to a returned error",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::error_consistency::duplicated_oauth_creds_check::64c03f2b": {
+      "id": "review::.::holistic::error_consistency::duplicated_oauth_creds_check::64c03f2b",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "OAuth credential detection logic is duplicated across two packages with no shared implementation",
+      "detail": {
+        "holistic": true,
+        "dimension": "error_consistency",
+        "related_files": [
+          "internal/runtime/auth.go",
+          "internal/preflight/preflight.go"
+        ],
+        "evidence": [
+          "internal/runtime/auth.go:hasOAuthCredentials reads .claude/*.json files, checks size > 0",
+          "internal/preflight/preflight.go:hasOAuthCreds implements the exact same filesystem walk with identical logic",
+          "EnsureClaudeAuthEnv in preflight.go duplicates the API key env lookup already present in DetectClaudeAuth in runtime/auth.go",
+          "Drift risk: one copy could be updated while the other is not"
+        ],
+        "suggestion": "Remove preflight/hasOAuthCreds and have EnsureClaudeAuthEnv call runtime.DetectClaudeAuth instead \u2014 the AuthDetection result already encodes both API key and OAuth presence",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::error_consistency::spawn_mixed_error_typing::c8d5252a": {
+      "id": "review::.::holistic::error_consistency::spawn_mixed_error_typing::c8d5252a",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "cmd/spawn.go mixes typed errors.New* with bare fmt.Errorf for equivalent failure categories",
+      "detail": {
+        "holistic": true,
+        "dimension": "error_consistency",
+        "related_files": [
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "spawn.go line 182: fmt.Errorf('no runtime available ...') \u2014 bare fmt.Errorf for a validation failure",
+          "spawn.go line 201: fmt.Errorf('failed to resolve start directory: %w...') \u2014 bare fmt.Errorf for I/O failure",
+          "spawn.go line 236: fmt.Errorf('failed to resolve worktrees from yak %q: %w', ...) \u2014 bare fmt.Errorf",
+          "spawn.go line 209: errors.NewValidationError(...) \u2014 correctly typed",
+          "spawn.go line 223: errors.NewValidationError(...) \u2014 correctly typed",
+          "The exit code for bare fmt.Errorf falls through to GetExitCode default of 1 \u2014 correct by accident, not by design"
+        ],
+        "suggestion": "Replace bare fmt.Errorf with errors.NewRuntimeError for I/O and external command failures, and errors.NewValidationError for user-input/configuration failures throughout cmd/spawn.go runSpawn",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::cross_module_architecture::cmd_check_bypasses_runtime_layer::3c486659": {
+      "id": "review::.::holistic::cross_module_architecture::cmd_check_bypasses_runtime_layer::3c486659",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "cmd/check.go reaches past internal/runtime to invoke Docker directly for container listing, formatting, and cost queries",
+      "detail": {
+        "holistic": true,
+        "dimension": "cross_module_architecture",
+        "related_files": [
+          "cmd/check.go",
+          "internal/runtime/sandboxed.go"
+        ],
+        "evidence": [
+          "cmd/check.go line 161: exec.Command(\"docker\", \"ps\", \"--filter\", \"name=yak-worker-\", \"--format\", ...) runs a second docker ps after runtime.ListRunningContainers already fetched the same list on line 155.",
+          "cmd/check.go lines 187-188: another raw exec.Command(\"docker\", \"ps\", \"-a\", ...) to list stopped containers \u2014 no corresponding function in internal/runtime.",
+          "cmd/check.go lines 210-226: getContainerCost calls docker exec twice without going through any runtime abstraction.",
+          "internal/runtime already exports ListRunningContainers and ListAllContainers covering the same queries."
+        ],
+        "suggestion": "Add ListStoppedContainers and GetContainerCost functions to internal/runtime/sandboxed.go (following the existing pattern). Have cmd/check.go call those instead of constructing raw docker commands. This unifies all Docker interactions behind the runtime boundary and makes the check command testable without a real Docker daemon.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::cross_module_architecture::oauth_cred_check_duplicated_across_packages::846f0d98": {
+      "id": "review::.::holistic::cross_module_architecture::oauth_cred_check_duplicated_across_packages::846f0d98",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "OAuth credential directory scan is duplicated between internal/runtime/auth.go and internal/preflight/preflight.go under different names",
+      "detail": {
+        "holistic": true,
+        "dimension": "cross_module_architecture",
+        "related_files": [
+          "internal/runtime/auth.go",
+          "internal/preflight/preflight.go"
+        ],
+        "evidence": [
+          "internal/runtime/auth.go lines 44-63: hasOAuthCredentials reads .claude/ directory, filters .json files, checks non-zero size.",
+          "internal/preflight/preflight.go lines 174-190: hasOAuthCreds performs identical logic with a minor style difference (string concat vs filepath.Join for claudeDir path).",
+          "EnsureClaudeAuthEnv in preflight.go calls its local hasOAuthCreds; DetectClaudeAuth in runtime/auth.go calls its local hasOAuthCredentials \u2014 two diverging copies of the same detection logic."
+        ],
+        "suggestion": "Consolidate into a single exported or unexported function in internal/runtime/auth.go (already the canonical home for Claude auth detection). Have preflight.EnsureClaudeAuthEnv call runtime.DetectClaudeAuth instead of duplicating the scan. This removes the duplication and gives preflight a proper dependency on the auth-detection boundary rather than reimplementing it.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::cross_module_architecture::passwd_group_generation_duplicated::44481994": {
+      "id": "review::.::holistic::cross_module_architecture::passwd_group_generation_duplicated::44481994",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "Docker /etc/passwd and /etc/group content generation is duplicated between cmd/auth.go and internal/runtime/helpers.go",
+      "detail": {
+        "holistic": true,
+        "dimension": "cross_module_architecture",
+        "related_files": [
+          "cmd/auth.go",
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "cmd/auth.go lines 124-126: passwdContent = fmt.Sprintf(\"root:x:0:0:root:/root:/bin/bash\\nyakshaver:x:%d:%d:Yak Shaver:/home/yak-shaver:/bin/bash\\n\", uid, gid); groupContent = fmt.Sprintf(\"root:x:0:\\nyakshaver:x:%d:\\n\", gid)",
+          "internal/runtime/helpers.go lines 160-161 (in generateRunScript): identical format strings for passwdContent and groupContent.",
+          "The hardcoded username 'yakshaver' and home path '/home/yak-shaver' appear in both locations \u2014 if either changes, the other will silently diverge."
+        ],
+        "suggestion": "Extract a generatePasswdGroup(uid, gid int) (passwd, group string) helper in internal/runtime/helpers.go. Have both generateRunScript and cmd/auth.go runAuthLogin call it. This establishes a single source of truth for the container identity format.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::cross_module_architecture::commander_interface_not_applied_uniformly::c4a5e84f": {
+      "id": "review::.::holistic::cross_module_architecture::commander_interface_not_applied_uniformly::c4a5e84f",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "internal/runtime sandboxed functions use bare exec.Command for stop/list operations while SpawnSandboxedWorker uses the Commander interface, making stop/list untestable",
+      "detail": {
+        "holistic": true,
+        "dimension": "cross_module_architecture",
+        "related_files": [
+          "internal/runtime/sandboxed.go"
+        ],
+        "evidence": [
+          "SpawnSandboxedWorker uses cfg.commander.CommandContext (line 194) \u2014 testable via WithCommander.",
+          "StopSandboxedWorker (line 210) uses exec.Command('docker', 'ps', ...) directly \u2014 not injectable.",
+          "ListRunningContainers (line 239) and ListAllContainers (line 257) use exec.Command directly \u2014 not injectable.",
+          "This inconsistency means the testability seam established by Commander only covers spawn, not stop or list."
+        ],
+        "suggestion": "Extend the Commander interface or introduce a package-level commander variable initialized to defaultCommander. Apply it consistently to StopSandboxedWorker, ListRunningContainers, and ListAllContainers so all Docker interactions in the package are injectable for testing.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::cross_module_architecture::devcontainer_config_implied_broken_contract::b00d7c5a": {
+      "id": "review::.::holistic::cross_module_architecture::devcontainer_config_implied_broken_contract::b00d7c5a",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "pkg/devcontainer.Config parses many devcontainer.json fields that the runtime silently ignores, creating a misleading public API surface",
+      "detail": {
+        "holistic": true,
+        "dimension": "cross_module_architecture",
+        "related_files": [
+          "pkg/devcontainer/config.go"
+        ],
+        "evidence": [
+          "pkg/devcontainer/config.go lines 39-42 docstring: 'currently honors only: Image, Mounts, ContainerEnv, and RemoteEnv. Other fields (RunArgs, Privileged, CapAdd, SecurityOpt, ContainerUser, WorkspaceMount, lifecycle commands, etc.) are parsed but not applied'.",
+          "The Config struct exports RunArgs, Privileged, CapAdd, SecurityOpt, InitializeCommand, PostCreateCommand, etc. \u2014 callers setting these fields receive no error, warning, or documentation at the call site.",
+          "internal/runtime/helpers.go generateRunScript only reads devConfig.Mounts and devConfig.Image; it ignores RunArgs, CapAdd, Privileged without any indication to the caller."
+        ],
+        "suggestion": "Either: (a) narrow Config to only the fields yak-box actually applies, moving the full-spec fields to a separate ParsedDevcontainerSpec type used only for JSON parsing; or (b) emit a runtime warning when LoadConfig encounters non-empty values in ignored fields. Option (a) makes the pkg boundary honest; option (b) is a lower-effort improvement. Add a SUPPORTED.md or a code comment listing which fields are honoured, so the contract is explicit.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::convention_outlier::missing_message_cmd_registration::62e32c80": {
+      "id": "review::.::holistic::convention_outlier::missing_message_cmd_registration::62e32c80",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "messageCmd defined and tested but never registered with rootCmd \u2014 command is unreachable",
+      "detail": {
+        "holistic": true,
+        "dimension": "convention_outlier",
+        "related_files": [
+          "cmd/message.go",
+          "cmd/root.go"
+        ],
+        "evidence": [
+          "cmd/root.go init() calls AddCommand for spawnCmd, stopCmd, checkCmd, diffCmd, authCmd \u2014 messageCmd is absent.",
+          "cmd/message.go defines messageCmd and registers flags in init(), but never calls rootCmd.AddCommand(messageCmd) or any parent AddCommand.",
+          "cmd/message_test.go exercises messageCmd flags and PreRunE directly, confirming it was intentionally implemented."
+        ],
+        "suggestion": "Add rootCmd.AddCommand(messageCmd) in cmd/root.go init() alongside the other command registrations.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::convention_outlier::duplicate_oauth_check_helpers::de079052": {
+      "id": "review::.::holistic::convention_outlier::duplicate_oauth_check_helpers::de079052",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "hasOAuthCredentials and hasOAuthCreds implement identical logic in two separate packages with different names",
+      "detail": {
+        "holistic": true,
+        "dimension": "convention_outlier",
+        "related_files": [
+          "internal/runtime/auth.go",
+          "internal/preflight/preflight.go"
+        ],
+        "evidence": [
+          "internal/runtime/auth.go:44: func hasOAuthCredentials(shaverHomeDir string) bool \u2014 uses filepath.Join for claudeDir construction.",
+          "internal/preflight/preflight.go:174: func hasOAuthCreds(homeDir string) bool \u2014 uses string concatenation (homeDir + '/.claude') for the same path.",
+          "Both functions scan for non-empty .json files in homeDir/.claude/ using identical ReadDir + Info().Size() logic."
+        ],
+        "suggestion": "Extract hasOAuthCredentials into internal/runtime/auth.go (already the canonical auth package) and have EnsureClaudeAuthEnv in preflight call runtime.DetectClaudeAuth or expose a shared helper from the auth package instead of duplicating the check.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::convention_outlier::inconsistent_worker_flag_names::5169825a": {
+      "id": "review::.::holistic::convention_outlier::inconsistent_worker_flag_names::5169825a",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "Sibling cmd/ commands use different flag names for the same 'which worker/identity' concept: --name, --yak-name, --shaver",
+      "detail": {
+        "holistic": true,
+        "dimension": "convention_outlier",
+        "related_files": [
+          "cmd/diff.go",
+          "cmd/stop.go",
+          "cmd/auth.go",
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "cmd/diff.go: --name flag identifies the worker whose home to diff.",
+          "cmd/stop.go: --yak-name flag identifies the worker to stop (mirrors spawn's --yak-name).",
+          "cmd/auth.go: --shaver flag identifies the worker identity for auth commands.",
+          "cmd/spawn.go: --yak-name for the worker name, --shaver-name for the human operator identity \u2014 a two-flag convention not reflected in stop or auth."
+        ],
+        "suggestion": "Standardize on --name (short) or --worker (semantic) for all commands that target an existing worker by its registered name. Reserve --shaver-name for the human operator identity. Update stop to match diff, or update both to a canonical flag name documented in a contributing guide.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::convention_outlier::mixed_output_routing_in_check::b494de32": {
+      "id": "review::.::holistic::convention_outlier::mixed_output_routing_in_check::b494de32",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "cmd/check.go mixes direct fmt.Printf with ui.Info/ui.Warning in the task-status loop while sibling commands route all output through ui.*",
+      "detail": {
+        "holistic": true,
+        "dimension": "convention_outlier",
+        "related_files": [
+          "cmd/check.go",
+          "cmd/stop.go",
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "cmd/check.go lines 139-144: wip status uses ui.Info(), blocked uses ui.Warning(), but default status falls through to fmt.Printf \u2014 three different output paths for logically parallel cases.",
+          "cmd/stop.go and cmd/spawn.go route all user-facing status messages through ui.Info/ui.Success/ui.Error consistently.",
+          "The fmt.Printf fallback in check.go bypasses NO_COLOR and TTY detection that ui.* provides."
+        ],
+        "suggestion": "Add a ui.Plain() or ui.Default() function for un-colored output, and use it for the default task-status case in check.go to maintain consistent routing through the ui package.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::test_strategy::ts-runspawn-untested::7f9f8fb2": {
+      "id": "review::.::holistic::test_strategy::ts-runspawn-untested::7f9f8fb2",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "runSpawn orchestration (730-LOC core spawn path) has zero test coverage",
+      "detail": {
+        "holistic": true,
+        "dimension": "test_strategy",
+        "related_files": [
+          "cmd/spawn.go",
+          "cmd/spawn_test.go"
+        ],
+        "evidence": [
+          "cmd/spawn_test.go tests only PreRunE (validation) and isolated helper functions: formatDisplayName, resolveShaverName, resolveSpawnModel, resolveSpawnSkills, copySkillsToHome, findTaskDir, resolveYakValue, findYakPath, resolveInheritedWorktrees.",
+          "runSpawn itself \u2014 which calls preflight.Run, devcontainer.LoadConfig, sessions.EnsureHomeDir, runtime.EnsureDevcontainer, runtime.SpawnSandboxedWorker or SpawnNativeWorker, sessions.Register, and writes assigned-to / worktree-path files \u2014 is never invoked in any test.",
+          "cmd/spawn.go complexity_score = 98.0 per holistic_context scan evidence, highest in codebase."
+        ],
+        "suggestion": "Extract the orchestration body of runSpawn into testable sub-functions with dependency injection (preflight runner, runtime spawner, session registrar as function-typed fields or interfaces), then write table-driven integration tests that mock the injected dependencies and assert session registration, task file writes, and error propagation.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::test_strategy::ts-spawn-global-state-coupling::27614445": {
+      "id": "review::.::holistic::test_strategy::ts-spawn-global-state-coupling::27614445",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "Spawn tests mutate shared package-level globals, causing ordering fragility",
+      "detail": {
+        "holistic": true,
+        "dimension": "test_strategy",
+        "related_files": [
+          "cmd/spawn_test.go",
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "Tests directly assign to package-level vars: `spawnCWD = tt.cwd`, `spawnName = tt.spawnName`, `spawnMode = tt.mode`, `spawnResources = tt.resources`, `spawnRuntime = tt.runtime`, `spawnTool = tool`.",
+          "Line 281: `spawnTool = \"claude\"` reset added manually inside TestSpawnToolOptions to avoid polluting subsequent tests \u2014 this is a symptom of the problem.",
+          "Tests run sequentially by accident of ordering; switching to `t.Parallel()` or reordering tests would expose the coupling."
+        ],
+        "suggestion": "Refactor spawn command to accept an options struct or functional options rather than package globals, so each test creates its own isolated configuration. Alternatively, save and restore all globals in t.Cleanup callbacks.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::test_strategy::ts-spawn-native-untested::14771987": {
+      "id": "review::.::holistic::test_strategy::ts-spawn-native-untested::14771987",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "SpawnNativeWorker top-level entry point has no test",
+      "detail": {
+        "holistic": true,
+        "dimension": "test_strategy",
+        "related_files": [
+          "internal/runtime/native.go",
+          "internal/runtime/native_test.go"
+        ],
+        "evidence": [
+          "native_test.go covers fileExists (3 cases), generateNativeWrapperScript (several variants), KillNativeProcessTree (3 cases), and setupClaudeSettings (1 case).",
+          "SpawnNativeWorker \u2014 which creates the home directory structure, writes the wrapper script, creates the Zellij layout, and launches zellij \u2014 is never called from any test, unlike the sandboxed path which has extensive SpawnSandboxedWorker coverage in sandboxed_test.go."
+        ],
+        "suggestion": "Add a TestSpawnNativeWorker test using a TestCommander (analogous to what sandboxed_test.go already does), verifying that the expected script files are created and zellij is invoked with the correct session arguments.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::test_strategy::ts-timing-dependent-network-check::a63d6372": {
+      "id": "review::.::holistic::test_strategy::ts-timing-dependent-network-check::a63d6372",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "TestGetNetworkMode_BridgeMode depends on Docker availability and a 1-second real-time timeout",
+      "detail": {
+        "holistic": true,
+        "dimension": "test_strategy",
+        "related_files": [
+          "internal/runtime/sandboxed_test.go"
+        ],
+        "evidence": [
+          "Line 501-508: `ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)` then calls `GetNetworkMode(ctx)` which internally runs `docker network inspect`.",
+          "If Docker is unavailable or slow in CI, this test either takes a full second to time out or returns an unexpected value. The assertion only checks `mode != \"\"`, which is too weak to detect wrong modes.",
+          "No mock/stub of the docker command is used here, unlike TestCommander in other sandboxed tests."
+        ],
+        "suggestion": "Inject the command runner into GetNetworkMode (or accept a lookup function), then test with a stub that returns a controlled response. Remove the real-time context timeout from the unit test.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::api_surface_coherence::spawn_api_shape_asymmetry::0eaa4507": {
+      "id": "review::.::holistic::api_surface_coherence::spawn_api_shape_asymmetry::0eaa4507",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "SpawnSandboxedWorker uses functional options while SpawnNativeWorker uses positional parameters \u2014 symmetric operations have incompatible API shapes",
+      "detail": {
+        "holistic": true,
+        "dimension": "api_surface_coherence",
+        "related_files": [
+          "internal/runtime/sandboxed.go",
+          "internal/runtime/native.go",
+          "internal/runtime/options.go",
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "SpawnSandboxedWorker(ctx context.Context, opts ...SpawnOption) error \u2014 variadic functional options pattern",
+          "SpawnNativeWorker(worker *types.Worker, prompt string, homeDir string) (pidFile string, err error) \u2014 three positional parameters, returns pidFile",
+          "cmd/spawn.go must handle these divergent shapes with two separate if-blocks (lines 384-404), duplicating worker/prompt/homeDir passing"
+        ],
+        "suggestion": "Extend the SpawnOption pattern to SpawnNativeWorker, or introduce a shared SpawnConfig struct that both functions accept. The functional-options pattern already exists in options.go \u2014 SpawnNativeWorker should consume a *spawnConfig built from the same options.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::api_surface_coherence::stop_parameter_asymmetry::d101488f": {
+      "id": "review::.::holistic::api_surface_coherence::stop_parameter_asymmetry::d101488f",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "StopSandboxedWorker and StopNativeWorker have divergent parameter shapes for the same stop operation",
+      "detail": {
+        "holistic": true,
+        "dimension": "api_surface_coherence",
+        "related_files": [
+          "internal/runtime/sandboxed.go",
+          "internal/runtime/native.go",
+          "cmd/stop.go"
+        ],
+        "evidence": [
+          "StopSandboxedWorker(name string, timeout time.Duration) error",
+          "StopNativeWorker(name, sessionName string) error",
+          "cmd/stop.go dispatches via if session.Runtime == 'sandboxed' / else if session.Runtime == 'native' with different parameter sets at each branch"
+        ],
+        "suggestion": "Unify behind a StopWorker(session *sessions.Session, timeout time.Duration) function, or add sessionName to the sandboxed variant and timeout to the native variant so both accept the same shape.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::api_surface_coherence::build_prompt_param_count::72f48aab": {
+      "id": "review::.::holistic::api_surface_coherence::build_prompt_param_count::72f48aab",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "BuildPrompt has 6 positional parameters, exceeding the public API boundary threshold",
+      "detail": {
+        "holistic": true,
+        "dimension": "api_surface_coherence",
+        "related_files": [
+          "internal/prompt/prompt.go",
+          "cmd/spawn.go"
+        ],
+        "evidence": [
+          "func BuildPrompt(mode string, yakPath string, userPrompt string, tasks []string, shaverName string, skillNames []string) string \u2014 6 parameters",
+          "All 6 are passed individually from cmd/spawn.go line 343"
+        ],
+        "suggestion": "Introduce a PromptConfig struct with fields Mode, YakPath, UserPrompt, Tasks, ShaverName, SkillNames and change BuildPrompt signature to BuildPrompt(cfg PromptConfig) string. This also makes future additions backward-compatible.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::api_surface_coherence::auth_check_duplication_and_shape_divergence::ca38603f": {
+      "id": "review::.::holistic::api_surface_coherence::auth_check_duplication_and_shape_divergence::ca38603f",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "OAuth credential checking logic is duplicated with different function signatures in runtime and preflight packages",
+      "detail": {
+        "holistic": true,
+        "dimension": "api_surface_coherence",
+        "related_files": [
+          "internal/runtime/auth.go",
+          "internal/preflight/preflight.go"
+        ],
+        "evidence": [
+          "runtime.DetectClaudeAuth(shaverHomeDir string, lookupEnv func(string)(string,bool)) AuthDetection \u2014 returns typed struct",
+          "preflight.EnsureClaudeAuthEnv(tool, runtime, shaverHomeDir string, lookupEnv func(string)(string,bool)) error \u2014 returns error",
+          "Both packages contain a private hasOAuth* helper with essentially identical directory-scan logic (runtime.hasOAuthCredentials and preflight.hasOAuthCreds)"
+        ],
+        "suggestion": "Have EnsureClaudeAuthEnv delegate to runtime.DetectClaudeAuth instead of reimplementing OAuth credential detection. Remove preflight.hasOAuthCreds and use the canonical runtime.DetectClaudeAuth function.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::api_surface_coherence::lifecycle_command_discriminated_union_leak::c952e6e8": {
+      "id": "review::.::holistic::api_surface_coherence::lifecycle_command_discriminated_union_leak::c952e6e8",
+      "detector": "review",
+      "file": ".",
+      "tier": 2,
+      "confidence": "medium",
+      "summary": "LifecycleCommand exposes a six-method type-switch surface instead of a unified execution interface",
+      "detail": {
+        "holistic": true,
+        "dimension": "api_surface_coherence",
+        "related_files": [
+          "pkg/devcontainer/lifecycle.go"
+        ],
+        "evidence": [
+          "Public API: IsString(), IsArray(), IsObject(), AsString(), AsArray(), AsObject(), ToStringSlice() \u2014 callers must externally discriminate the union",
+          "ToStringSlice() is the only integrating method, but its semantics (joining array elements with space) differ from a real execution model",
+          "AsObject() returns map[string]interface{} requiring further type assertions by callers"
+        ],
+        "suggestion": "Replace the six Is/As methods with a single Execute(executor CommandExecutor) error interface, or at minimum make ToStringSlice() the primary public API and mark As*/Is* as internal helpers. The current surface forces callers to re-implement the discriminated-union logic.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::authorization_consistency::auth_oauth_detection_duplicated::350f7efd": {
+      "id": "review::.::holistic::authorization_consistency::auth_oauth_detection_duplicated::350f7efd",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "OAuth credential detection logic duplicated in runtime/auth.go and preflight/preflight.go",
+      "detail": {
+        "holistic": true,
+        "dimension": "authorization_consistency",
+        "related_files": [
+          "internal/runtime/auth.go",
+          "internal/preflight/preflight.go"
+        ],
+        "evidence": [
+          "internal/runtime/auth.go defines hasOAuthCredentials(shaverHomeDir string) which walks shaverHomeDir/.claude/ looking for non-empty .json files.",
+          "internal/preflight/preflight.go defines hasOAuthCreds(homeDir string) with identical semantics but slightly different implementation: uses string concatenation (homeDir + \"/.claude\") instead of filepath.Join, and combines the IsDir/HasSuffix check into a single if.",
+          "Both functions are unexported and serve the same purpose: determine if OAuth credentials are present in a worker home directory."
+        ],
+        "suggestion": "Remove hasOAuthCreds from preflight.go and have EnsureClaudeAuthEnv call runtime.DetectClaudeAuth(shaverHomeDir, nil) and check its Mode, or export hasOAuthCredentials from the runtime package. This ensures the detection algorithm has one implementation.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::authorization_consistency::auth_login_missing_security_hardening::19ff467e": {
+      "id": "review::.::holistic::authorization_consistency::auth_login_missing_security_hardening::19ff467e",
+      "detector": "review",
+      "file": ".",
+      "tier": 1,
+      "confidence": "high",
+      "summary": "auth-login container omits security flags (--cap-drop ALL, --security-opt no-new-privileges) present in the main sandboxed spawn path",
+      "detail": {
+        "holistic": true,
+        "dimension": "authorization_consistency",
+        "related_files": [
+          "cmd/auth.go",
+          "internal/runtime/helpers.go"
+        ],
+        "evidence": [
+          "generateRunScript in internal/runtime/helpers.go emits --security-opt no-new-privileges and --cap-drop ALL for every sandboxed worker container.",
+          "cmd/auth.go runAuthLogin builds its own docker run args slice (lines 141-153) inline and does not include these security flags, using only --network=bridge and basic user/volume args.",
+          "The auth-login container runs claude login \u2014 an OAuth flow that is network-active \u2014 without the same capability restrictions applied to worker containers."
+        ],
+        "suggestion": "Extract a shared docker run arg builder (or at minimum a security-args helper) so auth-login and sandboxed spawn use the same baseline security options. At minimum, add --security-opt no-new-privileges --cap-drop ALL to the auth-login docker args.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-09T20:01:55+00:00",
+      "last_seen": "2026-03-09T20:01:55+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
     }
   },
   "scan_coverage": {
@@ -1753,13 +4002,130 @@
     "dimensions": []
   },
   "subjective_integrity": {
-    "status": "pass",
-    "target_score": 95.0,
+    "status": "disabled",
+    "target_score": null,
     "matched_count": 0,
     "matched_dimensions": [],
     "reset_dimensions": []
   },
-  "subjective_assessments": {},
+  "subjective_assessments": {
+    "abstraction_fitness": {
+      "score": 60.8,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00",
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty",
+        "Delegation Density",
+        "Definition Directness",
+        "Type Discipline"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 72.0,
+        "Indirection Cost": 85.0,
+        "Interface Honesty": 88.0,
+        "Delegation Density": 100.0,
+        "Definition Directness": 70.0,
+        "Type Discipline": 90.0
+      }
+    },
+    "ai_generated_debt": {
+      "score": 70.5,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "api_surface_coherence": {
+      "score": 38.0,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "authorization_consistency": {
+      "score": 72.3,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "contract_coherence": {
+      "score": 68.8,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "convention_outlier": {
+      "score": 49.2,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "cross_module_architecture": {
+      "score": 44.0,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "dependency_health": {
+      "score": 93.0,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "design_coherence": {
+      "score": 48.8,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "error_consistency": {
+      "score": 51.4,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "high_level_elegance": {
+      "score": 53.4,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "incomplete_migration": {
+      "score": 93.0,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "initialization_coupling": {
+      "score": 83.6,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "logic_clarity": {
+      "score": 65.9,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "low_level_elegance": {
+      "score": 57.5,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "mid_level_elegance": {
+      "score": 38.0,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "naming_quality": {
+      "score": 66.4,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "package_organization": {
+      "score": 57.1,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "test_strategy": {
+      "score": 46.0,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    },
+    "type_safety": {
+      "score": 43.4,
+      "source": "holistic",
+      "assessed_at": "2026-03-09T20:01:55+00:00"
+    }
+  },
   "scan_history": [
     {
       "timestamp": "2026-03-08T12:24:28+00:00",
@@ -2405,6 +4771,135 @@
           "strict": 0.0
         }
       }
+    },
+    {
+      "timestamp": "2026-03-09T20:01:55+00:00",
+      "lang": "go",
+      "strict_score": 70.6,
+      "verified_strict_score": 96.3,
+      "objective_score": 96.3,
+      "overall_score": 70.6,
+      "open": 145,
+      "diff_new": 68,
+      "diff_resolved": 0,
+      "ignored": 0,
+      "raw_issues": 68,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "disabled",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": null
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "Code quality": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Security": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "File health": {
+          "score": 97.9,
+          "strict": 97.9
+        },
+        "Duplication": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Test health": {
+          "score": 91.0,
+          "strict": 91.0
+        },
+        "Naming quality": {
+          "score": 66.4,
+          "strict": 66.4
+        },
+        "Logic clarity": {
+          "score": 65.9,
+          "strict": 65.9
+        },
+        "Type safety": {
+          "score": 43.4,
+          "strict": 43.4
+        },
+        "Contracts": {
+          "score": 68.8,
+          "strict": 68.8
+        },
+        "Error consistency": {
+          "score": 51.4,
+          "strict": 51.4
+        },
+        "Abstraction fit": {
+          "score": 60.8,
+          "strict": 60.8
+        },
+        "AI generated debt": {
+          "score": 70.5,
+          "strict": 70.5
+        },
+        "High elegance": {
+          "score": 53.4,
+          "strict": 53.4
+        },
+        "Mid elegance": {
+          "score": 38.0,
+          "strict": 38.0
+        },
+        "Low elegance": {
+          "score": 57.5,
+          "strict": 57.5
+        },
+        "Cross-module arch": {
+          "score": 44.0,
+          "strict": 44.0
+        },
+        "Init coupling": {
+          "score": 83.6,
+          "strict": 83.6
+        },
+        "Convention drift": {
+          "score": 49.2,
+          "strict": 49.2
+        },
+        "Dep health": {
+          "score": 93.0,
+          "strict": 93.0
+        },
+        "Test strategy": {
+          "score": 46.0,
+          "strict": 46.0
+        },
+        "API coherence": {
+          "score": 38.0,
+          "strict": 38.0
+        },
+        "Auth consistency": {
+          "score": 72.3,
+          "strict": 72.3
+        },
+        "Stale migration": {
+          "score": 93.0,
+          "strict": 93.0
+        },
+        "Structure nav": {
+          "score": 57.1,
+          "strict": 57.1
+        },
+        "Design coherence": {
+          "score": 48.8,
+          "strict": 48.8
+        }
+      }
     }
   ],
   "lang_capabilities": {
@@ -2418,7 +4913,7 @@
     "test": 30
   },
   "tool_hash": "eb6de7c2b5fe",
-  "scan_path": ".",
+  "scan_path": null,
   "scan_completeness": {
     "go": "full"
   },
@@ -2433,7 +4928,8 @@
       "subjective_review": 33,
       "boilerplate_duplication": 0,
       "dupes": 443,
-      "stale_wontfix": 0
+      "stale_wontfix": 0,
+      "review": 10
     }
   },
   "codebase_metrics": {
@@ -2509,11 +5005,11 @@
       }
     },
     "Test health": {
-      "score": 91.0,
-      "strict": 91.0,
-      "verified_strict_score": 91.0,
+      "score": 91.1,
+      "strict": 91.1,
+      "verified_strict_score": 91.1,
       "checks": 417,
-      "failing": 37,
+      "failing": 36,
       "tier": 4,
       "detectors": {
         "test_coverage": {
@@ -2524,27 +5020,27 @@
         },
         "subjective_review": {
           "potential": 33,
-          "pass_rate": 0.6909090909090909,
-          "failing": 34,
-          "weighted_failures": 10.2
+          "pass_rate": 0.7000000000000001,
+          "failing": 33,
+          "weighted_failures": 9.9
         }
       }
     },
     "Naming quality": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 66.4,
+      "strict": 66.4,
+      "verified_strict_score": 66.4,
       "checks": 10,
-      "failing": 0,
+      "failing": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.664,
+          "failing": 4,
+          "weighted_failures": 3.36,
+          "assessment_score": 66.4,
+          "placeholder": false,
           "dimension_key": "naming_quality",
           "configured_weight": 2.0,
           "components": []
@@ -2552,20 +5048,20 @@
       }
     },
     "Logic clarity": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 65.9,
+      "strict": 65.9,
+      "verified_strict_score": 65.9,
       "checks": 10,
-      "failing": 0,
+      "failing": 3,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.659,
+          "failing": 3,
+          "weighted_failures": 3.41,
+          "assessment_score": 65.9,
+          "placeholder": false,
           "dimension_key": "logic_clarity",
           "configured_weight": 6.0,
           "components": []
@@ -2573,20 +5069,20 @@
       }
     },
     "Type safety": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 43.4,
+      "strict": 43.4,
+      "verified_strict_score": 43.4,
       "checks": 10,
-      "failing": 0,
+      "failing": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.434,
+          "failing": 4,
+          "weighted_failures": 5.66,
+          "assessment_score": 43.4,
+          "placeholder": false,
           "dimension_key": "type_safety",
           "configured_weight": 12.0,
           "components": []
@@ -2594,20 +5090,20 @@
       }
     },
     "Contracts": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 68.8,
+      "strict": 68.8,
+      "verified_strict_score": 68.8,
       "checks": 10,
-      "failing": 0,
+      "failing": 3,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.688,
+          "failing": 3,
+          "weighted_failures": 3.12,
+          "assessment_score": 68.8,
+          "placeholder": false,
           "dimension_key": "contract_coherence",
           "configured_weight": 12.0,
           "components": []
@@ -2615,20 +5111,20 @@
       }
     },
     "Error consistency": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 51.4,
+      "strict": 51.4,
+      "verified_strict_score": 51.4,
       "checks": 10,
-      "failing": 0,
+      "failing": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.514,
+          "failing": 4,
+          "weighted_failures": 4.86,
+          "assessment_score": 51.4,
+          "placeholder": false,
           "dimension_key": "error_consistency",
           "configured_weight": 3.0,
           "components": []
@@ -2636,41 +5132,56 @@
       }
     },
     "Abstraction fit": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 60.8,
+      "strict": 60.8,
+      "verified_strict_score": 60.8,
       "checks": 10,
-      "failing": 0,
+      "failing": 3,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.608,
+          "failing": 3,
+          "weighted_failures": 3.92,
+          "assessment_score": 60.8,
+          "placeholder": false,
           "dimension_key": "abstraction_fitness",
           "configured_weight": 8.0,
-          "components": []
+          "components": [
+            "Abstraction Leverage",
+            "Indirection Cost",
+            "Interface Honesty",
+            "Delegation Density",
+            "Definition Directness",
+            "Type Discipline"
+          ],
+          "component_scores": {
+            "Abstraction Leverage": 72.0,
+            "Indirection Cost": 85.0,
+            "Interface Honesty": 88.0,
+            "Delegation Density": 100.0,
+            "Definition Directness": 70.0,
+            "Type Discipline": 90.0
+          }
         }
       }
     },
     "AI generated debt": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 70.5,
+      "strict": 70.5,
+      "verified_strict_score": 70.5,
       "checks": 10,
-      "failing": 0,
+      "failing": 3,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.705,
+          "failing": 3,
+          "weighted_failures": 2.95,
+          "assessment_score": 70.5,
+          "placeholder": false,
           "dimension_key": "ai_generated_debt",
           "configured_weight": 1.0,
           "components": []
@@ -2678,20 +5189,20 @@
       }
     },
     "High elegance": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 53.4,
+      "strict": 53.4,
+      "verified_strict_score": 53.4,
       "checks": 10,
-      "failing": 0,
+      "failing": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.534,
+          "failing": 4,
+          "weighted_failures": 4.66,
+          "assessment_score": 53.4,
+          "placeholder": false,
           "dimension_key": "high_level_elegance",
           "configured_weight": 22.0,
           "components": []
@@ -2699,20 +5210,20 @@
       }
     },
     "Mid elegance": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 38.0,
+      "strict": 38.0,
+      "verified_strict_score": 38.0,
       "checks": 10,
-      "failing": 0,
+      "failing": 5,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.38,
+          "failing": 5,
+          "weighted_failures": 6.2,
+          "assessment_score": 38.0,
+          "placeholder": false,
           "dimension_key": "mid_level_elegance",
           "configured_weight": 22.0,
           "components": []
@@ -2720,20 +5231,20 @@
       }
     },
     "Low elegance": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 57.5,
+      "strict": 57.5,
+      "verified_strict_score": 57.5,
       "checks": 10,
-      "failing": 0,
+      "failing": 5,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.575,
+          "failing": 5,
+          "weighted_failures": 4.25,
+          "assessment_score": 57.5,
+          "placeholder": false,
           "dimension_key": "low_level_elegance",
           "configured_weight": 12.0,
           "components": []
@@ -2741,20 +5252,20 @@
       }
     },
     "Cross-module arch": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 44.0,
+      "strict": 44.0,
+      "verified_strict_score": 44.0,
       "checks": 10,
-      "failing": 0,
+      "failing": 5,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.44,
+          "failing": 5,
+          "weighted_failures": 5.6,
+          "assessment_score": 44.0,
+          "placeholder": false,
           "dimension_key": "cross_module_architecture",
           "configured_weight": 1.0,
           "components": []
@@ -2762,20 +5273,20 @@
       }
     },
     "Init coupling": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 83.6,
+      "strict": 83.6,
+      "verified_strict_score": 83.6,
       "checks": 10,
-      "failing": 0,
+      "failing": 1,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.836,
+          "failing": 1,
+          "weighted_failures": 1.64,
+          "assessment_score": 83.6,
+          "placeholder": false,
           "dimension_key": "initialization_coupling",
           "configured_weight": 1.0,
           "components": []
@@ -2783,20 +5294,20 @@
       }
     },
     "Convention drift": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 49.2,
+      "strict": 49.2,
+      "verified_strict_score": 49.2,
       "checks": 10,
-      "failing": 0,
+      "failing": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.492,
+          "failing": 4,
+          "weighted_failures": 5.08,
+          "assessment_score": 49.2,
+          "placeholder": false,
           "dimension_key": "convention_outlier",
           "configured_weight": 1.0,
           "components": []
@@ -2804,20 +5315,20 @@
       }
     },
     "Dep health": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 93.0,
+      "strict": 93.0,
+      "verified_strict_score": 93.0,
       "checks": 10,
       "failing": 0,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
+          "pass_rate": 0.93,
           "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "weighted_failures": 0.7,
+          "assessment_score": 93.0,
+          "placeholder": false,
           "dimension_key": "dependency_health",
           "configured_weight": 1.0,
           "components": []
@@ -2825,20 +5336,20 @@
       }
     },
     "Test strategy": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 46.0,
+      "strict": 46.0,
+      "verified_strict_score": 46.0,
       "checks": 10,
-      "failing": 0,
+      "failing": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.46,
+          "failing": 4,
+          "weighted_failures": 5.4,
+          "assessment_score": 46.0,
+          "placeholder": false,
           "dimension_key": "test_strategy",
           "configured_weight": 1.0,
           "components": []
@@ -2846,20 +5357,20 @@
       }
     },
     "API coherence": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 38.0,
+      "strict": 38.0,
+      "verified_strict_score": 38.0,
       "checks": 10,
-      "failing": 0,
+      "failing": 5,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.38,
+          "failing": 5,
+          "weighted_failures": 6.2,
+          "assessment_score": 38.0,
+          "placeholder": false,
           "dimension_key": "api_surface_coherence",
           "configured_weight": 1.0,
           "components": []
@@ -2867,20 +5378,20 @@
       }
     },
     "Auth consistency": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 72.3,
+      "strict": 72.3,
+      "verified_strict_score": 72.3,
       "checks": 10,
-      "failing": 0,
+      "failing": 2,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.723,
+          "failing": 2,
+          "weighted_failures": 2.77,
+          "assessment_score": 72.3,
+          "placeholder": false,
           "dimension_key": "authorization_consistency",
           "configured_weight": 1.0,
           "components": []
@@ -2888,20 +5399,20 @@
       }
     },
     "Stale migration": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 93.0,
+      "strict": 93.0,
+      "verified_strict_score": 93.0,
       "checks": 10,
       "failing": 0,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
+          "pass_rate": 0.93,
           "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "weighted_failures": 0.7,
+          "assessment_score": 93.0,
+          "placeholder": false,
           "dimension_key": "incomplete_migration",
           "configured_weight": 1.0,
           "components": []
@@ -2909,20 +5420,20 @@
       }
     },
     "Structure nav": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 57.1,
+      "strict": 57.1,
+      "verified_strict_score": 57.1,
       "checks": 10,
-      "failing": 0,
+      "failing": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.571,
+          "failing": 4,
+          "weighted_failures": 4.29,
+          "assessment_score": 57.1,
+          "placeholder": false,
           "dimension_key": "package_organization",
           "configured_weight": 5.0,
           "components": []
@@ -2930,20 +5441,20 @@
       }
     },
     "Design coherence": {
-      "score": 0.0,
-      "strict": 0.0,
-      "verified_strict_score": 0.0,
+      "score": 48.8,
+      "strict": 48.8,
+      "verified_strict_score": 48.8,
       "checks": 10,
-      "failing": 0,
+      "failing": 5,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.0,
-          "failing": 0,
-          "weighted_failures": 10.0,
-          "assessment_score": 0.0,
-          "placeholder": true,
+          "pass_rate": 0.488,
+          "failing": 5,
+          "weighted_failures": 5.12,
+          "assessment_score": 48.8,
+          "placeholder": false,
           "dimension_key": "design_coherence",
           "configured_weight": 10.0,
           "components": []
@@ -2956,5 +5467,27 @@
     "report_scores": 5,
     "feedback_nudge": 3,
     "stagnant_nudge": 25
-  }
+  },
+  "review_cache": {
+    "files": {},
+    "holistic": {
+      "reviewed_at": "2026-03-09T20:01:55+00:00",
+      "file_count_at_review": 64,
+      "issue_count": 68
+    }
+  },
+  "assessment_import_audit": [
+    {
+      "timestamp": "2026-03-09T20:01:55+00:00",
+      "mode": "trusted_internal",
+      "trusted": true,
+      "reason": "trusted import-run replay from 20260309_195328",
+      "override_used": false,
+      "attested_external": false,
+      "provisional": false,
+      "provisional_count": 0,
+      "attest": "",
+      "import_file": "/home/mrdavidlaing/Work/yakthang/src/yak-box/.desloppify/subagents/runs/20260309_195328/holistic_issues_merged.json"
+    }
+  ]
 }

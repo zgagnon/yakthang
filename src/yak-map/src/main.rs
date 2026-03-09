@@ -359,14 +359,15 @@ impl State {
     fn status_symbol(&self, task: &TaskLine) -> char {
         if let Some(status) = &task.agent_status {
             if status.starts_with("done:") {
-                return '●';
+                return '✓';
             }
             if status.starts_with("wip:") || status.starts_with("blocked:") {
                 return '●';
             }
         }
         match task.state {
-            TaskState::Wip | TaskState::Done => '●',
+            TaskState::Wip => '●',
+            TaskState::Done => '✓',
             TaskState::Todo => '○',
         }
     }

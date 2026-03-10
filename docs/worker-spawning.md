@@ -68,10 +68,10 @@ See [Docker Mode](development/DOCKER-MODE.md) for architecture details.
 
 | Name | Emoji | Trait |
 |------|-------|-------|
-| Yakriel | 🦬🪒 | Precise and methodical. Measures twice, shaves once. |
-| Yakueline | 🦬💈 | Fast and fearless. Ships first, asks forgiveness later. |
-| Yakov | 🦬🔔 | Cautious and thorough. Better safe than shorn. |
-| Yakira | 🦬🧶 | Cheerful and communicative. Leaves detailed status updates. |
+| Yakriel | 🐃🪒 | Precise and methodical. Measures twice, shaves once. |
+| Yakueline | 🐃💈 | Fast and fearless. Ships first, asks forgiveness later. |
+| Yakov | 🐃🔔 | Cautious and thorough. Better safe than shorn. |
+| Yakira | 🐃🧶 | Cheerful and communicative. Leaves detailed status updates. |
 
 Personalities are randomly assigned. They give each worker tab a distinct
 identity and influence the agent's working style through the system prompt.

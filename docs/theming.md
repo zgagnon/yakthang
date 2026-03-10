@@ -75,10 +75,10 @@ Yakob (the orchestrator agent) uses **Gruvbox neutral yellow** (`#d79921`) as it
 
 Workers use the standard `plan` and `build` agents with personalities injected via prompts (not separate themed agents). This keeps the agent system simple while still providing personality variety through the randomly-assigned worker names and emojis:
 
-- **Yakriel** 🦬🪒 - Precise and methodical
-- **Yakueline** 🦬💈 - Fast and fearless
-- **Yakov** 🦬🔔 - Cautious and thorough
-- **Yakira** 🦬🧶 - Cheerful and communicative
+- **Yakriel** 🐃🪒 - Precise and methodical
+- **Yakueline** 🐃💈 - Fast and fearless
+- **Yakov** 🐃🔔 - Cautious and thorough
+- **Yakira** 🐃🧶 - Cheerful and communicative
 
 Worker personalities are loaded from `.opencode/personalities/` and injected into the prompt by `yak-box spawn`.
 

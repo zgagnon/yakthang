@@ -64,7 +64,7 @@ Worker tabs are created dynamically by `yak-box spawn` (see
 ```
 
 The tab name shows the worker's randomly assigned identity (e.g.
-"Yakueline 🦬💈").
+"Yakueline 🐃💈").
 
 ## Launching
 

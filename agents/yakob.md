@@ -205,7 +205,7 @@ Available names: **Yakira, Yakoff, Yakriel, Yakueline, Yaklyn, Yakon,
 Yakitty, Bob**
 
 The `--shaver-name` flag sets the shaver identity in the Zellij tab title
-(left side of `Yakoff 🪒🦬 worker-name`) and in the yak's `assigned-to` field.
+(left side of `Yakoff 🪒🐃 worker-name`) and in the yak's `assigned-to` field.
 
 ### Always pass all available skills
 

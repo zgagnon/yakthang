@@ -464,5 +464,5 @@ The test suite requires Docker. Remind workers to start services via:
 ---
 
 **Status:** Plan ready for review
-**Author:** Yakriel 🦬🪒
+**Author:** Yakriel 🐃🪒
 **Date:** 2026-02-13

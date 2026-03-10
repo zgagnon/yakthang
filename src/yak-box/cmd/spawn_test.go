@@ -47,7 +47,7 @@ func TestSpawnFlags(t *testing.T) {
 func TestFormatDisplayName(t *testing.T) {
 	t.Run("uses shaver and worker names when different", func(t *testing.T) {
 		displayName := formatDisplayName("Yakov", "cursor-test")
-		assert.Equal(t, "Yakov 🪒🦬 cursor-test", displayName)
+		assert.Equal(t, "Yakov 🪒🐃 cursor-test", displayName)
 	})
 
 	t.Run("uses shaver name once when names match", func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestFormatDisplayName(t *testing.T) {
 
 	t.Run("trims worker name", func(t *testing.T) {
 		displayName := formatDisplayName("Yakov", "  cursor test  ")
-		assert.Equal(t, "Yakov 🪒🦬 cursor test", displayName)
+		assert.Equal(t, "Yakov 🪒🐃 cursor test", displayName)
 	})
 
 	t.Run("falls back to shaver name when worker name empty", func(t *testing.T) {

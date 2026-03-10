@@ -135,14 +135,14 @@ func resolveShaverName() string {
 	return "yak-shaver"
 }
 
-// formatDisplayName returns the Zellij tab title: "shaverName 🪒🦬 workerName" when
+// formatDisplayName returns the Zellij tab title: "shaverName 🪒🐃 workerName" when
 // they differ, or just shaverName when worker name is empty or the same.
 func formatDisplayName(shaverName, workerName string) string {
 	trimmedName := strings.TrimSpace(workerName)
 	if trimmedName == "" || trimmedName == shaverName {
 		return shaverName
 	}
-	return fmt.Sprintf("%s 🪒🦬 %s", shaverName, trimmedName)
+	return fmt.Sprintf("%s 🪒🐃 %s", shaverName, trimmedName)
 }
 
 func resolveSpawnModel(tool, model string) string {

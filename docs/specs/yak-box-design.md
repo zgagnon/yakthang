@@ -115,8 +115,8 @@ Simple wrapper around `docker stop -t 10`. Does NOT clean up metadata or task as
 
 ```bash
 SHAVER_NAME="Yakov"
-SHAVER_EMOJI="🦬🔔"
-DISPLAY_NAME="Yakov 🦬🔔 api-auth"
+SHAVER_EMOJI="🐃🔔"
+DISPLAY_NAME="Yakov 🐃🔔 api-auth"
 TAB_NAME="api-auth"
 CONTAINER_NAME="yak-worker-api-auth"
 RUNTIME="sandboxed"

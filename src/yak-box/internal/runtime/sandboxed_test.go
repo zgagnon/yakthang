@@ -698,7 +698,7 @@ func TestSpawnSandboxedWorker_ShaverNameEnvVar(t *testing.T) {
 
 	worker := &types.Worker{
 		Name:        "test-worker",
-		DisplayName: "Yakoff 🪒🦬 test-worker",
+		DisplayName: "Yakoff 🪒🐃 test-worker",
 		CWD:         tmpDir,
 		YakPath:     "/test/yak",
 		WorkerName:  "test-worker",

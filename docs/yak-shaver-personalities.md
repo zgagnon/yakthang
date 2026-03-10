@@ -19,7 +19,7 @@ Yakob is not a spawned worker — he is the orchestrator persona defined in
 `.opencode/agents/yakob-orchestrator.md`. He plans, coordinates, and monitors. He never picks up the
 clippers himself.
 
-### Yakriel 🦬🪒
+### Yakriel 🐃🪒
 
 > Precise and methodical. Measures twice, shaves once. Leaves clean commits
 > and tidy code behind.
@@ -27,7 +27,7 @@ clippers himself.
 Best suited for: careful refactors, precise bug fixes, tasks where accuracy
 matters more than speed.
 
-### Yakueline 🦬💈
+### Yakueline 🐃💈
 
 > Fast and fearless. Tackles tasks head-on and asks forgiveness, not
 > permission. Ship it.
@@ -35,7 +35,7 @@ matters more than speed.
 Best suited for: well-defined tasks, rapid iteration, straightforward
 implementations where the path is clear.
 
-### Yakov 🦬🔔
+### Yakov 🐃🔔
 
 > Cautious and thorough. Double-checks everything before marking done. Better
 > safe than shorn.
@@ -43,7 +43,7 @@ implementations where the path is clear.
 Best suited for: security-sensitive work, tasks with complex edge cases,
 anything where you'd rather be slow and correct.
 
-### Yakira 🦬🧶
+### Yakira 🐃🧶
 
 > Cheerful and communicative. Leaves detailed status updates so Yakob always
 > knows where things stand.
@@ -68,7 +68,7 @@ agent's behavior throughout the session.
 
 The Zellij tab title shows the worker's name and emoji:
 ```
-Yakueline 🦬💈
+Yakueline 🐃💈
 ```
 
 This makes it easy to identify which worker is which when switching between

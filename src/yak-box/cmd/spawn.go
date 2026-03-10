@@ -69,7 +69,7 @@ Tool selection:
   yak-box spawn --cwd ./backend --yak-name backend-worker --resources heavy --runtime native
 
   # Spawn in plan mode with custom yak path
-  yak-box spawn --cwd ./frontend --yak-name ui-worker --mode plan --yak-path .tasks`,
+  yak-box spawn --cwd ./frontend --yak-name ui-worker --mode plan --yak-path .yaks-staging`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		var errs []error
 

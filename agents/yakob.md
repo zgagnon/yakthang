@@ -95,8 +95,9 @@ the limit:
 
 Do not spawn. Surface the drain queue (which wip yaks are closest to done).
 
-**After each shaver finishes**, check the current time against `hard-stop`. If
-the current time is at or past the hard stop:
+**After each shaver finishes**, check the current time against `hard-stop`.
+**Always run `date +"%H:%M"` to get the actual time -- never estimate or guess
+from memory.** If the current time is at or past the hard stop:
 
 > "Hard stop reached (HH:MM). Triggering yak wrap -- no new shavers."
 

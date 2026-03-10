@@ -65,7 +65,9 @@ User instructions: $ARGUMENTS
    - Types: new, update, remove, security, setup, chore, test, docs, release
    - Keep description under 72 characters
    - Add body if needed for context (blank line after subject)
-   - Always include "Co-Authored-By: Claude <noreply@anthropic.com>" at the end
+   - Always include a Co-Authored-By trailer at the end. Check the `$YAK_SHAVER_NAME` environment variable:
+     - If set (e.g. "Yakoff"): `Co-Authored-By: Yakoff (Claude) <noreply@anthropic.com>`
+     - If unset: `Co-Authored-By: Claude <noreply@anthropic.com>`
 
 5. **Create the commit**:
    - Use `git commit -m` with the generated message
@@ -87,7 +89,7 @@ User instructions: $ARGUMENTS
    Added JWT refresh token rotation with secure storage
    and automatic renewal before expiration.
 
-   Co-Authored-By: Claude <noreply@anthropic.com>
+   Co-Authored-By: Yakoff (Claude) <noreply@anthropic.com>
    ----------------------------------------
 
    Run 'git log -1' to view the commit

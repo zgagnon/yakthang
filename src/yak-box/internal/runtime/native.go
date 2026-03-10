@@ -214,6 +214,14 @@ func generateNativeWrapperScript(worker *types.Worker, homeDir, hostHomeDir, pro
 	if worker.ShaverName != "" {
 		shaverNameLine = fmt.Sprintf("export YAK_SHAVER_NAME=%q\n", worker.ShaverName)
 	}
+
+	// Resolve the host's git identity now (while HOME still points at the real
+	// home directory) so we can export it explicitly in the wrapper script.
+	// This is necessary because GIT_CONFIG_GLOBAL points at the host's
+	// .gitconfig, but that file may use include paths with ~ which git resolves
+	// via HOME — and HOME gets overridden to the worker's home dir.
+	gitIdentityLines := resolveGitIdentityExports()
+
 	switch worker.Tool {
 	case "claude":
 		paneName = "claude (build) [native]"
@@ -239,7 +247,7 @@ export PATH="%s:$PATH"
 export HOME=%q
 %s
 %s
-export IS_DEMO=true
+%sexport IS_DEMO=true
 %sexport YAK_PATH="%s"
 %s
 unset CLAUDECODE
@@ -266,7 +274,7 @@ trap _restore_keychain EXIT
 # Write PID before running Claude so yak-box stop can find and kill the process tree.
 echo $$ > "%s"
 claude "${CLAUDE_ARGS[@]}" @"$PROMPT_FILE"
-`, filepath.Join(hostHomeDir, ".local", "bin"), homeDir, gitConfigGlobalLine, ghConfigDirLine, shaverNameLine, worker.YakPath, apiKeyLine, worker.Model, promptFile, pidFile)
+`, filepath.Join(hostHomeDir, ".local", "bin"), homeDir, gitConfigGlobalLine, ghConfigDirLine, gitIdentityLines, shaverNameLine, worker.YakPath, apiKeyLine, worker.Model, promptFile, pidFile)
 	case "cursor":
 		paneName = "cursor (build) [native]"
 		content = fmt.Sprintf(`#!/usr/bin/env bash

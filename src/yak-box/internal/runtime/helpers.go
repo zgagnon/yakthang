@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -157,6 +158,23 @@ func generateRunScript(cfg *spawnConfig, workspaceRoot, promptFile, innerScript,
 	if info, err := os.Stat(hostGHConfigDir); err == nil && info.IsDir() {
 		sb.WriteString("\t-e GH_CONFIG_DIR=/home/yak-shaver/.host-gh-config \\\n")
 	}
+	// Pin the host's git identity via env vars. The mounted .host-gitconfig may
+	// use include paths with ~ (e.g. ~/.gitconfig-mrdavidlaing) which git resolves
+	// via HOME — inside the container HOME=/home/yak-shaver, breaking the include.
+	if name, err := exec.Command("git", "config", "--global", "user.name").Output(); err == nil {
+		n := strings.TrimSpace(string(name))
+		if n != "" {
+			sb.WriteString(fmt.Sprintf("\t-e GIT_AUTHOR_NAME=\"%s\" \\\n", n))
+			sb.WriteString(fmt.Sprintf("\t-e GIT_COMMITTER_NAME=\"%s\" \\\n", n))
+		}
+	}
+	if email, err := exec.Command("git", "config", "--global", "user.email").Output(); err == nil {
+		e := strings.TrimSpace(string(email))
+		if e != "" {
+			sb.WriteString(fmt.Sprintf("\t-e GIT_AUTHOR_EMAIL=\"%s\" \\\n", e))
+			sb.WriteString(fmt.Sprintf("\t-e GIT_COMMITTER_EMAIL=\"%s\" \\\n", e))
+		}
+	}
 	sb.WriteString("\t-e TERM=xterm-256color \\\n")
 	sb.WriteString("\t-e IS_DEMO=true \\\n") // Bypass Claude Code interactive onboarding wizard
 	sb.WriteString("\t-e GOPATH=/home/yak-shaver/.go \\\n")
@@ -234,6 +252,33 @@ func generateRunScript(cfg *spawnConfig, workspaceRoot, promptFile, innerScript,
 	sb.WriteString(fmt.Sprintf("\t%s \\\n", imageName))
 	sb.WriteString("\tbash /opt/worker/start.sh build\n")
 
+	return sb.String()
+}
+
+// resolveGitIdentityExports shells out to git config to read user.name and
+// user.email while HOME still points at the real home directory. It returns
+// shell export lines that pin GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL,
+// GIT_COMMITTER_NAME, and GIT_COMMITTER_EMAIL. This is necessary because
+// GIT_CONFIG_GLOBAL points at the host's .gitconfig, but that file may use
+// include paths with ~ (e.g. ~/.gitconfig-mrdavidlaing) which git resolves
+// via HOME — and HOME gets overridden to the worker's home dir, breaking
+// the include resolution.
+func resolveGitIdentityExports() string {
+	var sb strings.Builder
+	if name, err := exec.Command("git", "config", "--global", "user.name").Output(); err == nil {
+		n := strings.TrimSpace(string(name))
+		if n != "" {
+			sb.WriteString(fmt.Sprintf("export GIT_AUTHOR_NAME=%q\n", n))
+			sb.WriteString(fmt.Sprintf("export GIT_COMMITTER_NAME=%q\n", n))
+		}
+	}
+	if email, err := exec.Command("git", "config", "--global", "user.email").Output(); err == nil {
+		e := strings.TrimSpace(string(email))
+		if e != "" {
+			sb.WriteString(fmt.Sprintf("export GIT_AUTHOR_EMAIL=%q\n", e))
+			sb.WriteString(fmt.Sprintf("export GIT_COMMITTER_EMAIL=%q\n", e))
+		}
+	}
 	return sb.String()
 }
 

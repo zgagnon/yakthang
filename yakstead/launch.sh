@@ -3,6 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SESSION_NAME="${1:-$(basename "$(pwd)")}"
+
+if ! command -v nu &>/dev/null; then
+    echo "Error: nushell (nu) not found in PATH — required for yakthang shell panes" >&2
+    exit 1
+fi
 SESSIONS=$(zellij list-sessions 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' || true)
 
 # Clean up dead sessions

@@ -47,7 +47,9 @@ func GenerateLayout(worker *types.Worker, runtimeKind, tool string) string {
             command "bash"
             args "%%WRAPPER%%"
         }
-        pane size=5 name="shell: %s"
+        pane size=5 name="shell: %s" {
+            command "nu"
+        }
         pane size=2 borderless=true {
             plugin location="status-bar"
         }

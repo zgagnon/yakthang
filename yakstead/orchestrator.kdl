@@ -166,7 +166,9 @@ layout {
                     command "claude"
                     args "--agent" "yakob" "--dangerously-skip-permissions"
                 }
-                pane size="20%" name="shell (orchestrator)"
+                pane size="20%" name="shell (orchestrator)" {
+                    command "nu"
+                }
             }
         }
     }

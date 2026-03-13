@@ -44,7 +44,7 @@ impl TaskRepository {
     fn walk_dir(&self, dir: &std::path::Path, depth: usize, tasks: &mut Vec<(String, usize)>) {
         if let Ok(entries) = std::fs::read_dir(dir) {
             let mut entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
-            entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+            entries.sort_by_key(|a| a.file_name());
 
             for entry in entries {
                 let path = entry.path();
@@ -84,11 +84,11 @@ impl TaskRepository {
 
         let name = self
             .get_field(path, ".name")
-            .unwrap_or_else(|| path.split('/').last().unwrap_or(path).to_string());
+            .unwrap_or_else(|| path.split('/').next_back().unwrap_or(path).to_string());
 
         let yak_id = self
             .get_field(path, ".id")
-            .unwrap_or_else(|| path.split('/').last().unwrap_or(path).to_string());
+            .unwrap_or_else(|| path.split('/').next_back().unwrap_or(path).to_string());
 
         TaskLine {
             path: path.to_string(),
@@ -221,15 +221,31 @@ printf '\033]52;c;{enc}\007' > /dev/tty 2>/dev/null"#,
 /// Encode bytes as base64 (standard alphabet, with padding).
 fn base64_encode(data: &[u8]) -> String {
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as usize;
-        let b1 = if chunk.len() > 1 { chunk[1] as usize } else { 0 };
-        let b2 = if chunk.len() > 2 { chunk[2] as usize } else { 0 };
+        let b1 = if chunk.len() > 1 {
+            chunk[1] as usize
+        } else {
+            0
+        };
+        let b2 = if chunk.len() > 2 {
+            chunk[2] as usize
+        } else {
+            0
+        };
         out.push(CHARS[b0 >> 2] as char);
         out.push(CHARS[((b0 & 3) << 4) | (b1 >> 4)] as char);
-        out.push(if chunk.len() > 1 { CHARS[((b1 & 0xf) << 2) | (b2 >> 6)] as char } else { '=' });
-        out.push(if chunk.len() > 2 { CHARS[b2 & 0x3f] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            CHARS[((b1 & 0xf) << 2) | (b2 >> 6)] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            CHARS[b2 & 0x3f] as char
+        } else {
+            '='
+        });
     }
     out
 }
@@ -302,16 +318,12 @@ impl State {
             }
         }
 
-        for i in 0..tasks.len() {
-            let path = &tasks[i].path;
+        let paths: Vec<String> = tasks.iter().map(|t| t.path.clone()).collect();
+        for (i, path) in paths.iter().enumerate() {
             let mut continuations = Vec::new();
 
             // For each ancestor level (parent, grandparent, etc.), check if that ancestor has siblings after it
-            let mut current = if let Some(pos) = path.rfind('/') {
-                Some(path[..pos].to_string())
-            } else {
-                None
-            };
+            let mut current = path.rfind('/').map(|pos| path[..pos].to_string());
 
             while let Some(ancestor) = current {
                 // Get the parent's parent (to find siblings of the ancestor)
@@ -336,11 +348,7 @@ impl State {
                     }
                 }
 
-                current = if let Some(pos) = ancestor.rfind('/') {
-                    Some(ancestor[..pos].to_string())
-                } else {
-                    None
-                };
+                current = ancestor.rfind('/').map(|pos| ancestor[..pos].to_string());
             }
             tasks[i].ancestor_continuations = continuations;
         }
@@ -481,13 +489,7 @@ impl State {
             args: vec!["-c".to_string(), script],
             cwd: None,
         };
-        let coords = FloatingPaneCoordinates::new(
-            None,
-            None,
-            Some("102".to_string()),
-            None,
-            None,
-        );
+        let coords = FloatingPaneCoordinates::new(None, None, Some("102".to_string()), None, None);
         open_command_pane_floating(command, coords, BTreeMap::new());
     }
 }
@@ -552,7 +554,10 @@ impl ZellijPlugin for State {
                             if !context_path.exists() {
                                 let _ = std::fs::write(&context_path, "");
                             }
-                            let host_path = context_path.strip_prefix("/host").unwrap_or(&context_path).to_path_buf();
+                            let host_path = context_path
+                                .strip_prefix("/host")
+                                .unwrap_or(&context_path)
+                                .to_path_buf();
                             let file_to_open = FileToOpen::new(host_path);
                             open_file_floating(file_to_open, None, BTreeMap::new());
                         }
@@ -576,11 +581,7 @@ impl ZellijPlugin for State {
                     }
                     _ => false,
                 };
-                if handled {
-                    true
-                } else {
-                    false
-                }
+                handled
             }
             _ => false,
         }
@@ -610,7 +611,13 @@ impl ZellijPlugin for State {
             self.scroll_offset = self.selected_index - max_rows + 1;
         }
 
-        for (i, task) in self.tasks.iter().skip(self.scroll_offset).take(max_rows).enumerate() {
+        for (i, task) in self
+            .tasks
+            .iter()
+            .skip(self.scroll_offset)
+            .take(max_rows)
+            .enumerate()
+        {
             let line = self.render_task(task);
 
             if self.scroll_offset + i == self.selected_index {
@@ -978,10 +985,7 @@ mod tests {
         let d = state.tasks.iter().find(|t| t.name == "d").unwrap();
         // Columns: [grandparent b has siblings → │ ] [parent c has no siblings → "  "] then ╰─
         let prefix = state.tree_prefix(d);
-        assert_eq!(
-            prefix,
-            "\x1b[90m│ \x1b[0m  \x1b[90m╰─\x1b[0m"
-        );
+        assert_eq!(prefix, "\x1b[90m│ \x1b[0m  \x1b[90m╰─\x1b[0m");
     }
 
     #[test]
@@ -1121,7 +1125,11 @@ mod tests {
 
         let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
         let rendered = state.render_task(task);
-        assert!(rendered.contains("✅"), "pass should render ✅: {:?}", rendered);
+        assert!(
+            rendered.contains("✅"),
+            "pass should render ✅: {:?}",
+            rendered
+        );
     }
 
     #[test]
@@ -1139,7 +1147,11 @@ mod tests {
 
         let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
         let rendered = state.render_task(task);
-        assert!(rendered.contains("❌"), "fail should render ❌: {:?}", rendered);
+        assert!(
+            rendered.contains("❌"),
+            "fail should render ❌: {:?}",
+            rendered
+        );
     }
 
     #[test]
@@ -1157,7 +1169,11 @@ mod tests {
 
         let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
         let rendered = state.render_task(task);
-        assert!(rendered.contains("🔍"), "in-progress should render 🔍: {:?}", rendered);
+        assert!(
+            rendered.contains("🔍"),
+            "in-progress should render 🔍: {:?}",
+            rendered
+        );
     }
 
     #[test]
@@ -1175,7 +1191,11 @@ mod tests {
 
         let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
         let rendered = state.render_task(task);
-        assert!(rendered.contains("✅"), "pass: looks good should render ✅: {:?}", rendered);
+        assert!(
+            rendered.contains("✅"),
+            "pass: looks good should render ✅: {:?}",
+            rendered
+        );
     }
 
     #[test]
@@ -1193,7 +1213,11 @@ mod tests {
 
         let task = state.tasks.iter().find(|t| t.name == "my-task").unwrap();
         let rendered = state.render_task(task);
-        assert!(rendered.contains("❌"), "fail: missing tests should render ❌: {:?}", rendered);
+        assert!(
+            rendered.contains("❌"),
+            "fail: missing tests should render ❌: {:?}",
+            rendered
+        );
     }
 
     #[test]
@@ -1270,9 +1294,21 @@ mod tests {
     fn highlight_line_uses_explicit_bg_not_reverse_video() {
         let state = State::default();
         let result = state.highlight_line("hello", "   ");
-        assert!(result.starts_with("\x1b[48;5;237m"), "should start with explicit bg: {:?}", result);
-        assert!(!result.contains("\x1b[7m"), "should not use reverse video: {:?}", result);
-        assert!(result.ends_with("\x1b[0m"), "should end with reset: {:?}", result);
+        assert!(
+            result.starts_with("\x1b[48;5;237m"),
+            "should start with explicit bg: {:?}",
+            result
+        );
+        assert!(
+            !result.contains("\x1b[7m"),
+            "should not use reverse video: {:?}",
+            result
+        );
+        assert!(
+            result.ends_with("\x1b[0m"),
+            "should end with reset: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -1282,7 +1318,11 @@ mod tests {
         let line = "\x1b[32mfoo\x1b[0mbar";
         let result = state.highlight_line(line, "");
         // After each \x1b[0m the bg color should be re-established
-        assert!(result.contains("\x1b[0m\x1b[48;5;237m"), "bg not re-established after reset: {:?}", result);
+        assert!(
+            result.contains("\x1b[0m\x1b[48;5;237m"),
+            "bg not re-established after reset: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -1305,6 +1345,10 @@ mod tests {
         assert!(result.starts_with(bg));
         // padding is inside the bg scope (before the final reset)
         let reset_pos = result.rfind("\x1b[0m").unwrap();
-        assert!(reset_pos == result.len() - "\x1b[0m".len(), "final reset should be at end: {:?}", result);
+        assert!(
+            reset_pos == result.len() - "\x1b[0m".len(),
+            "final reset should be at end: {:?}",
+            result
+        );
     }
 }

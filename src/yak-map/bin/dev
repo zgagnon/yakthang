@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# bin/dev — quality gate for yak-map
+#
+# Usage:
+#   dev check        Run all checks (lint + test + complexity + WASM build)
+#   dev lint         Run clippy + rustfmt check
+#   dev test         Run cargo test (native target)
+#   dev cx           Run complexity analysis (cognitive + cyclomatic thresholds)
+#   dev --help       Show this help
+#
+# Complexity baseline (2026-03-13, after clippy auto-fixes):
+#   update:        cognitive=28, cyclomatic=25
+#   refresh_tasks: cognitive=24, cyclomatic=23
+#   walk_dir:      cognitive=15, cyclomatic=8
+#   base64_encode: cognitive=13, cyclomatic=6
+#   strip_ansi:    cognitive=12, cyclomatic=6
+#   render:        cognitive=12, cyclomatic=10
+#
+# Thresholds are set at baseline max + 1 (tighten as code is refactored).
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+usage() {
+  sed -n '2,16p' "$0" | sed 's/^#[[:space:]]*//'
+}
+
+lint() {
+  local exit_code=0
+
+  echo "Running Rust clippy..."
+  if ! cargo clippy -- -D warnings; then
+    exit_code=1
+  fi
+
+  echo ""
+  echo "Running Rust format check..."
+  if ! cargo fmt --check; then
+    exit_code=1
+  fi
+
+  return $exit_code
+}
+
+test_cmd() {
+  cargo test
+}
+
+complexity() {
+  # Thresholds — tighten these over time as code is refactored
+  # Baseline measured 2026-03-13: max cognitive=28 (update), max cyclomatic=25 (update)
+  local max_cognitive=29
+  local max_cyclomatic=26
+
+  if ! command -v rust-code-analysis-cli >/dev/null 2>&1; then
+    echo "❌ rust-code-analysis-cli not found"
+    echo "   Install via: cargo install rust-code-analysis-cli"
+    echo "   Or use nix-shell: nix-shell -p rust-code-analysis --run 'bin/dev cx'"
+    return 1
+  fi
+
+  local metrics_output
+  metrics_output=$(rust-code-analysis-cli --metrics -p src/ --output-format json 2>&1)
+  local metrics_exit=$?
+  if [ $metrics_exit -ne 0 ]; then
+    echo "❌ Code metrics failed (exit code $metrics_exit)"
+    echo "$metrics_output"
+    return 1
+  fi
+
+  local file_count
+  file_count=$(echo "$metrics_output" | wc -l | tr -d ' ')
+  echo "Files analyzed: $file_count"
+  echo ""
+  echo "Complexity thresholds: cognitive ≤ $max_cognitive, cyclomatic ≤ $max_cyclomatic"
+  echo ""
+
+  echo "Top 5 most complex functions (cognitive):"
+  echo "$metrics_output" \
+    | jq -rs '
+      [.[] | .name as $file | .spaces[]? | recurse(.spaces[]?) | select(.kind == "function") |
+        {name: .name, file: $file, cyclomatic: .metrics.cyclomatic.sum, cognitive: .metrics.cognitive.sum, sloc: .metrics.loc.sloc}
+      ] | sort_by(-.cognitive) | .[0:5][] |
+      "  \(.file)::\(.name): cognitive=\(.cognitive) cyclomatic=\(.cyclomatic) sloc=\(.sloc)"
+    '
+  echo ""
+
+  local violations
+  violations=$(echo "$metrics_output" \
+    | jq -rs --argjson max_cog "$max_cognitive" --argjson max_cyc "$max_cyclomatic" '
+      [.[] | .name as $file | .spaces[]? | recurse(.spaces[]?) | select(.kind == "function") |
+        {name: .name, file: $file, cyclomatic: .metrics.cyclomatic.sum, cognitive: .metrics.cognitive.sum, sloc: .metrics.loc.sloc}
+      ] | map(select(.cognitive > $max_cog or .cyclomatic > $max_cyc))
+      | sort_by(-.cognitive) | .[] |
+      "  ❌ \(.file)::\(.name): cognitive=\(.cognitive) cyclomatic=\(.cyclomatic) sloc=\(.sloc)"
+    ')
+
+  if [ -n "$violations" ]; then
+    echo "Functions exceeding thresholds:"
+    echo "$violations"
+    echo ""
+    local count
+    count=$(echo "$violations" | wc -l | tr -d ' ')
+    echo "❌ $count function(s) exceed complexity thresholds"
+    return 1
+  fi
+
+  echo "✓ All functions within complexity thresholds"
+}
+
+check() {
+  echo "=== WASM build ==="
+  echo "Building WASM target (wasm32-wasip1)..."
+  if ! cargo build --target wasm32-wasip1 --release --quiet; then
+    echo "❌ WASM build failed"
+    return 1
+  fi
+  echo "✓ WASM build passed"
+
+  echo ""
+  echo "=== Lint ==="
+  if ! lint; then
+    echo "❌ Lint failed"
+    return 1
+  fi
+  echo "✓ Lint passed"
+
+  echo ""
+  echo "=== Tests ==="
+  if ! test_cmd; then
+    echo "❌ Tests failed"
+    return 1
+  fi
+  echo "✓ Tests passed"
+
+  echo ""
+  echo "=== Complexity ==="
+  if ! command -v rust-code-analysis-cli >/dev/null 2>&1; then
+    echo "⚠️  rust-code-analysis-cli not installed — skipping complexity check"
+    echo "   Install via: nix-shell -p rust-code-analysis --run 'bin/dev cx'"
+  elif ! complexity; then
+    echo "❌ Complexity check failed"
+    return 1
+  fi
+
+  echo ""
+  echo "✅ All checks passed"
+}
+
+case "${1:-help}" in
+  check|c)      check ;;
+  lint|l)       lint ;;
+  test|t)       test_cmd ;;
+  cx)           complexity ;;
+  --help|-h|help) usage ;;
+  *)
+    echo "Unknown command: $1"
+    echo ""
+    usage
+    exit 1
+    ;;
+esac

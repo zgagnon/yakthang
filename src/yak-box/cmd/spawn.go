@@ -404,13 +404,19 @@ func runSpawn(cmd *cobra.Command, ctx context.Context, args []string) error {
 	}
 
 	taskName := ""
+	var taskDirs []string
 	if len(resolvedYaks) > 0 {
 		taskName = resolvedYaks[0].DisplayPath
+		taskDirs = make([]string, len(resolvedYaks))
+		for i := range resolvedYaks {
+			taskDirs[i] = resolvedYaks[i].TaskDir
+		}
 	}
 
 	if err := sessions.Register(spawnName, sessions.Session{
 		Worker:        workerName,
 		Task:          taskName,
+		TaskDirs:      taskDirs,
 		Container:     worker.ContainerName,
 		SpawnedAt:     worker.SpawnedAt,
 		Runtime:       runtimeType,
@@ -480,14 +486,36 @@ func resolveYakValue(absYakPath, yakValue string) (taskDir, displayPath string, 
 		return foundByID, readTaskDisplayPath(foundByID, yakValue), nil
 	}
 
-	// 2. Fall back to slugify + findTaskDir (legacy behavior).
+	// 2. Search for a directory whose .name file matches exactly.
+	//    This handles the case where session.Task stores a display name
+	//    (from .name) that doesn't match the directory slug or .id.
+	var foundByName string
+	_ = filepath.Walk(absYakPath, func(path string, info os.FileInfo, errWalk error) error {
+		if errWalk != nil || info.IsDir() || info.Name() != ".name" {
+			return nil
+		}
+		data, errRead := os.ReadFile(path)
+		if errRead != nil {
+			return nil
+		}
+		if strings.TrimSpace(string(data)) == yakValue {
+			foundByName = filepath.Dir(path)
+			return errStop
+		}
+		return nil
+	})
+	if foundByName != "" {
+		return foundByName, readTaskDisplayPath(foundByName, yakValue), nil
+	}
+
+	// 4. Fall back to slugify + findTaskDir (legacy behavior).
 	taskSlug := types.SlugifyTaskPath(yakValue)
 	taskDir, err = findTaskDir(absYakPath, taskSlug)
 	if err == nil {
 		return taskDir, readTaskDisplayPath(taskDir, yakValue), nil
 	}
 
-	// 3. Try yx-style lowercase directory normalization for display names.
+	// 5. Try yx-style lowercase directory normalization for display names.
 	normalizedTaskSlug := strings.ToLower(taskSlug)
 	taskDir, err = findTaskDir(absYakPath, normalizedTaskSlug)
 	if err != nil {

@@ -599,6 +599,20 @@ func TestResolveYakValue(t *testing.T) {
 		assert.Equal(t, "native worker HOME override breaks git and gh auth", displayPath)
 	})
 
+	t.Run("resolves by .name content when slug and ID both miss", func(t *testing.T) {
+		// Simulates the stop-command scenario: session.Task stores a display name
+		// (from .name) that doesn't match the directory slug or .id.
+		mismatchDir := filepath.Join(tmpDir, "agent-status-enum")
+		os.MkdirAll(mismatchDir, 0755)
+		assert.NoError(t, os.WriteFile(filepath.Join(mismatchDir, ".id"), []byte("agent-status-enum-x1y2"), 0644))
+		assert.NoError(t, os.WriteFile(filepath.Join(mismatchDir, ".name"), []byte("agent-status-kind enum"), 0644))
+
+		taskDir, displayPath, err := resolveYakValue(tmpDir, "agent-status-kind enum")
+		assert.NoError(t, err)
+		assert.Equal(t, mismatchDir, taskDir)
+		assert.Equal(t, "agent-status-kind enum", displayPath)
+	})
+
 	t.Run("returns error for empty value", func(t *testing.T) {
 		_, _, err := resolveYakValue(tmpDir, "   ")
 		assert.Error(t, err)

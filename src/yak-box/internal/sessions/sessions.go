@@ -27,6 +27,7 @@ var (
 type Session struct {
 	Worker        string    `json:"worker"`
 	Task          string    `json:"task,omitempty"`
+	TaskDirs      []string  `json:"task_dirs,omitempty"`
 	Container     string    `json:"container,omitempty"`
 	SpawnedAt     time.Time `json:"spawned_at"`
 	Runtime       string    `json:"runtime"`

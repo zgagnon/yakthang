@@ -114,33 +114,40 @@ func runStop() error {
 
 	yakPath := ".yaks"
 	absYakPath, _ := filepath.Abs(yakPath)
-	var resolvedTaskDir string
-	if !stopForce && session.Task != "" {
-		taskDir, _, errResolve := resolveYakValue(absYakPath, session.Task)
-		if errResolve != nil {
-			fmt.Printf("Warning: Failed to find task directory for %s: %v\n", session.Task, errResolve)
+
+	// Resolve task directories: prefer stored TaskDirs, fall back to resolveYakValue.
+	var resolvedTaskDirs []string
+	if !stopForce && (len(session.TaskDirs) > 0 || session.Task != "") {
+		if len(session.TaskDirs) > 0 {
+			resolvedTaskDirs = session.TaskDirs
 		} else {
-			resolvedTaskDir = taskDir
-		}
-	}
-	if !stopForce && session.Task != "" {
-		ui.Info("⏳ Clearing task assignments...\n")
-		if resolvedTaskDir != "" {
-			taskFile := filepath.Join(resolvedTaskDir, "assigned-to")
-			if err := os.Remove(taskFile); err != nil && !os.IsNotExist(err) {
-				fmt.Printf("Warning: Failed to clear assignment for %s: %v\n", session.Task, err)
+			taskDir, _, errResolve := resolveYakValue(absYakPath, session.Task)
+			if errResolve != nil {
+				fmt.Printf("Warning: Failed to find task directory for %s: %v\n", session.Task, errResolve)
 			} else {
-				ui.Success("✅ Cleared assignment: %s\n", session.Task)
+				resolvedTaskDirs = []string{taskDir}
 			}
 		}
 	}
 
-	if !stopForce && session.Task != "" {
+	if !stopForce && len(resolvedTaskDirs) > 0 {
+		ui.Info("⏳ Clearing task assignments...\n")
+		for _, taskDir := range resolvedTaskDirs {
+			taskFile := filepath.Join(taskDir, "assigned-to")
+			if err := os.Remove(taskFile); err != nil && !os.IsNotExist(err) {
+				fmt.Printf("Warning: Failed to clear assignment for %s: %v\n", taskDir, err)
+			} else {
+				ui.Success("✅ Cleared assignment: %s\n", taskDir)
+			}
+		}
+	}
+
+	if !stopForce && len(resolvedTaskDirs) > 0 {
 		cost := extractWorkerCost(session)
 		if cost != "" {
 			ui.Info("💰 Session cost: %s\n", cost)
-			if resolvedTaskDir != "" {
-				spendFile := filepath.Join(resolvedTaskDir, "spend")
+			for _, taskDir := range resolvedTaskDirs {
+				spendFile := filepath.Join(taskDir, "spend")
 				if err := os.WriteFile(spendFile, []byte(cost), 0644); err != nil {
 					fmt.Printf("Warning: Failed to write spend field: %v\n", err)
 				}

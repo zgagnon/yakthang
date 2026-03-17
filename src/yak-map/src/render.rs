@@ -1,4 +1,3 @@
-use crate::model::ansi;
 use crate::model::{AgentStatusKind, ColorScheme, ReviewStatusKind, TaskLine, TaskState};
 
 /// Map review-status field value to display emoji: 🔍 in-progress, ✅ pass, ❌ fail.
@@ -133,6 +132,7 @@ pub fn render_task(task: &TaskLine, cs: &ColorScheme) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::ansi;
     use crate::model::{DARK, LIGHT};
     use crate::InMemoryTaskSource;
 

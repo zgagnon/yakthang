@@ -8,7 +8,6 @@ pub mod repository;
 mod tree;
 mod util;
 
-use model::ansi;
 use model::{TaskLine, DARK, LIGHT};
 use repository::{InMemoryTaskSource, TaskRepository, TaskSource};
 
@@ -181,6 +180,17 @@ impl ZellijPlugin for State {
         if configuration.get("light_mode").map(|v| v == "true").unwrap_or(false) {
             self.is_light_mode = true;
         }
+        // Fallback: COLORFGBG env var ("fg;bg") — set by some terminals.
+        // Background index >= 8 indicates a light background.
+        if !self.is_light_mode {
+            if let Ok(val) = std::env::var("COLORFGBG") {
+                if let Some(bg_str) = val.split(';').last() {
+                    if let Ok(bg) = bg_str.trim().parse::<u8>() {
+                        self.is_light_mode = bg >= 8;
+                    }
+                }
+            }
+        }
         subscribe(&[EventType::Timer, EventType::Key, EventType::ModeUpdate]);
         set_timeout(2.0);
         request_permission(&[PermissionType::OpenFiles, PermissionType::RunCommands]);
@@ -268,12 +278,76 @@ impl ZellijPlugin for State {
         if let Some(msg) = &self.toast_message.clone() {
             println!();
             let toast = format!(" {} ", msg);
-            println!("{}{}{}{}", ansi::REVERSE, ansi::BOLD, toast, ansi::RESET);
+            println!("{}{}{}{}", cs.reverse, cs.bold, toast, cs.reset);
         }
     }
 }
 
 register_plugin!(State);
+
+#[cfg(test)]
+mod contrast_tests {
+    // Verify LIGHT palette colors meet WCAG AA (4.5:1) against Ghostty biscotty bg #f5ede5.
+    // 256-color cube: index 16-231, channel values [0,95,135,175,215,255] for indices 0-5.
+    // Grayscale ramp 232-255: value = 8 + (index - 232) * 10.
+
+    const BG_BISCOTTY: (u8, u8, u8) = (245, 237, 229); // #f5ede5
+
+    fn linear(c: u8) -> f32 {
+        let v = c as f32 / 255.0;
+        if v <= 0.04045 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    fn luminance(rgb: (u8, u8, u8)) -> f32 {
+        0.2126 * linear(rgb.0) + 0.7152 * linear(rgb.1) + 0.0722 * linear(rgb.2)
+    }
+
+    fn contrast(fg: (u8, u8, u8), bg: (u8, u8, u8)) -> f32 {
+        let l1 = luminance(fg);
+        let l2 = luminance(bg);
+        let (lighter, darker) = if l1 > l2 { (l1, l2) } else { (l2, l1) };
+        (lighter + 0.05) / (darker + 0.05)
+    }
+
+    #[test]
+    fn light_red_contrast_ratio() {
+        // LIGHT.red = "\x1b[38;5;124m" = 256-color 124 = rgb(175, 0, 0)
+        let ratio = contrast((175, 0, 0), BG_BISCOTTY);
+        assert!(ratio >= 4.5, "LIGHT red {:.2}:1 < 4.5:1", ratio);
+    }
+
+    #[test]
+    fn light_green_contrast_ratio() {
+        // LIGHT.green = "\x1b[38;5;22m" = 256-color 22 = rgb(0, 95, 0)
+        let ratio = contrast((0, 95, 0), BG_BISCOTTY);
+        assert!(ratio >= 4.5, "LIGHT green {:.2}:1 < 4.5:1", ratio);
+    }
+
+    #[test]
+    fn light_yellow_contrast_ratio() {
+        // LIGHT.yellow = "\x1b[38;5;94m" = 256-color 94 = rgb(135, 95, 0)
+        let ratio = contrast((135, 95, 0), BG_BISCOTTY);
+        assert!(ratio >= 4.5, "LIGHT yellow {:.2}:1 < 4.5:1", ratio);
+    }
+
+    #[test]
+    fn light_cyan_contrast_ratio() {
+        // LIGHT.cyan = "\x1b[38;5;23m" = 256-color 23 = rgb(0, 95, 95)
+        let ratio = contrast((0, 95, 95), BG_BISCOTTY);
+        assert!(ratio >= 4.5, "LIGHT cyan {:.2}:1 < 4.5:1", ratio);
+    }
+
+    #[test]
+    fn light_dim_contrast_ratio() {
+        // LIGHT.dim = "\x1b[38;5;240m" = 256-color 240 (grayscale) = rgb(88, 88, 88)
+        let ratio = contrast((88, 88, 88), BG_BISCOTTY);
+        assert!(ratio >= 4.5, "LIGHT dim {:.2}:1 < 4.5:1", ratio);
+    }
+}
 
 #[cfg(test)]
 mod tests {

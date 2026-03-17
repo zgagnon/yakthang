@@ -41,12 +41,13 @@ pub const DARK: ColorScheme = ColorScheme {
 };
 
 pub const LIGHT: ColorScheme = ColorScheme {
-    red: "\x1b[31m",
-    green: "\x1b[32m",
-    yellow: "\x1b[33m",
-    cyan: "\x1b[36m",
-    fg_normal: "\x1b[39m",
-    dim: "\x1b[90m",
+    // 256-color codes chosen for >= 4.5:1 WCAG AA contrast against #f5ede5 (biscotty bg)
+    red: "\x1b[38;5;124m",    // #af0000 ~6.4:1
+    green: "\x1b[38;5;22m",   // #005f00 ~6.9:1
+    yellow: "\x1b[38;5;94m",  // #875f00 ~4.9:1
+    cyan: "\x1b[38;5;23m",    // #005f5f ~6.4:1
+    fg_normal: "\x1b[39m",    // terminal default fg (dark on light themes)
+    dim: "\x1b[38;5;240m",    // #585858 ~6.1:1
     reset: "\x1b[0m",
     bold: "\x1b[1m",
     reverse: "\x1b[7m",

@@ -69,6 +69,97 @@ The installer runs this command to determine the correct destination. If you
 need to override it, pass `--data-dir <PATH>` to `zellij`, which redirects
 Zellij's data directory (and thus the plugins subdirectory).
 
+## Task graph
+
+The `justfile` organizes recipes into three groups — **build**, **install**,
+and **doctor** — with explicit dependencies between them. Understanding the
+graph explains why individual targets exist alongside aggregate ones, and when
+to reach for each.
+
+### The graph
+
+```
+build group (independent — run in parallel with just --parallel):
+
+  build-yx        (cargo build, src/yaks)
+  build-yak-box   (go build, src/yak-box)
+  build-yak-map   (cargo build --target wasm32-wasip1, src/yak-map)
+  build
+  ├── build-yx
+  ├── build-yak-box
+  └── build-yak-map
+
+install group:
+
+  install-yx           depends on: build-yx
+  install-yak-box      depends on: build-yak-box
+  install-yak-map      depends on: build-yak-map  (uses ZELLIJ_PLUGIN_DIR)
+  install-agent        no build step  (copies yakob.md → CLAUDE_DIR/agents/)
+  install-skills       no build step  (copies skill dirs → CLAUDE_DIR/skills/)
+  install-config       no build step  (copies orchestrator.kdl → CONFIG_DIR)
+  install-launcher     no build step  (copies yakthang script → BIN_DIR)
+  install
+  ├── install-yx
+  ├── install-yak-box
+  ├── install-yak-map
+  ├── install-agent
+  ├── install-skills
+  ├── install-config
+  └── install-launcher
+
+doctor group:
+
+  check-yx             binary on PATH
+  check-yak-box        binary on PATH
+  check-yakthang       binary on PATH
+  check-agent          yakob.md exists
+  check-skills         each yak-* skill dir present
+  check-yak-map        wasm at ZELLIJ_PLUGIN_DIR
+  check-config         orchestrator.kdl at CONFIG_DIR
+  doctor
+  ├── check-yx
+  ├── check-yak-box
+  ├── check-yakthang
+  ├── check-agent
+  ├── check-skills
+  ├── check-yak-map
+  └── check-config
+```
+
+### ZELLIJ_PLUGIN_DIR variable
+
+The plugin directory is discovered once at the top of the justfile and shared
+by both `install-yak-map` and `check-yak-map`:
+
+```just
+ZELLIJ_PLUGIN_DIR := `zellij setup --check 2>/dev/null | grep 'PLUGIN DIR' | awk '{print $NF}'`
+```
+
+The backtick syntax evaluates the command once when `just` loads the file.
+Both recipes reference the same variable — no duplication, no divergence.
+`zellij setup --check` already handles the platform difference (Linux XDG vs
+macOS `~/Library`), so the justfile needs no conditional branching for this.
+
+### Why this structure
+
+**Independent build targets** let `just --parallel` maximize CPU use. None of
+the three build targets share artifacts, so they run concurrently without
+coordination.
+
+**Individual install-* targets** mean you can reinstall one component without
+rebuilding everything. Editing a skill? `just install-skills` is a file copy
+— no compilation. Tweaking the launcher? `just install-launcher`. The `install`
+aggregate is for first-time setup; individual targets are for iteration.
+
+**Doctor mirrors the install graph** — every `install-*` target has a
+corresponding `check-*`. This makes `just doctor` exhaustive by construction:
+if a component can be installed, it can be checked.
+
+**Agent, skills, config, and launcher have no build step.** They install
+directly from source — a file copy. This is intentional: these components
+change frequently (you edit skills, tweak config), and keeping their install
+path fast encourages `just install-skills` over a full `just install`.
+
 ## Why no interactive prompts
 
 The installer must work in two environments: a human running `just install`

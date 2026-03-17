@@ -9,3 +9,5 @@ version: 0.1.0
 dir: target/wasm32-wasip1/debug/yak-map.wasm
 permissions:
   - OpenFiles
+configuration:
+  light_mode: "false"  # set to "true" to force light-mode colors regardless of auto-detection

@@ -12,6 +12,48 @@ pub mod ansi {
     pub const BG_SELECTED: &str = "\x1b[48;5;237m";
 }
 
+pub struct ColorScheme {
+    pub red: &'static str,
+    pub green: &'static str,
+    pub yellow: &'static str,
+    pub cyan: &'static str,
+    pub fg_normal: &'static str,
+    pub dim: &'static str,
+    pub reset: &'static str,
+    pub bold: &'static str,
+    pub reverse: &'static str,
+    pub strikethrough: &'static str,
+    pub bg_selected: &'static str,
+}
+
+pub const DARK: ColorScheme = ColorScheme {
+    red: "\x1b[31m",
+    green: "\x1b[32m",
+    yellow: "\x1b[33m",
+    cyan: "\x1b[36m",
+    fg_normal: "\x1b[37m",
+    dim: "\x1b[90m",
+    reset: "\x1b[0m",
+    bold: "\x1b[1m",
+    reverse: "\x1b[7m",
+    strikethrough: "\x1b[9m",
+    bg_selected: "\x1b[48;5;237m",
+};
+
+pub const LIGHT: ColorScheme = ColorScheme {
+    red: "\x1b[31m",
+    green: "\x1b[32m",
+    yellow: "\x1b[33m",
+    cyan: "\x1b[36m",
+    fg_normal: "\x1b[39m",
+    dim: "\x1b[90m",
+    reset: "\x1b[0m",
+    bold: "\x1b[1m",
+    reverse: "\x1b[7m",
+    strikethrough: "\x1b[9m",
+    bg_selected: "\x1b[48;5;252m",
+};
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TaskState {
     Wip,

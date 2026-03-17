@@ -1,5 +1,5 @@
 use crate::model::ansi;
-use crate::model::{AgentStatusKind, ReviewStatusKind, TaskLine, TaskState};
+use crate::model::{AgentStatusKind, ColorScheme, ReviewStatusKind, TaskLine, TaskState};
 
 /// Map review-status field value to display emoji: 🔍 in-progress, ✅ pass, ❌ fail.
 /// Uses prefix matching (e.g. "pass: summary", "fail: missing tests") like agent-status.
@@ -12,19 +12,19 @@ pub fn review_status_emoji(value: &str) -> Option<&'static str> {
     }
 }
 
-pub fn task_color(task: &TaskLine) -> &'static str {
+pub fn task_color<'a>(task: &TaskLine, cs: &'a ColorScheme) -> &'a str {
     if let Some(status) = &task.agent_status {
         match AgentStatusKind::from_status_string(status) {
-            AgentStatusKind::Blocked => return ansi::RED,
-            AgentStatusKind::Done => return ansi::GREEN,
-            AgentStatusKind::Wip => return ansi::YELLOW,
+            AgentStatusKind::Blocked => return cs.red,
+            AgentStatusKind::Done => return cs.green,
+            AgentStatusKind::Wip => return cs.yellow,
             AgentStatusKind::Unknown => {}
         }
     }
     match task.state {
-        TaskState::Wip => ansi::YELLOW,
-        TaskState::Done => ansi::DIM,
-        TaskState::Todo => ansi::WHITE,
+        TaskState::Wip => cs.yellow,
+        TaskState::Done => cs.dim,
+        TaskState::Todo => cs.fg_normal,
     }
 }
 
@@ -43,14 +43,14 @@ pub fn status_symbol(task: &TaskLine) -> char {
     }
 }
 
-pub fn tree_prefix(task: &TaskLine) -> String {
+pub fn tree_prefix(task: &TaskLine, cs: &ColorScheme) -> String {
     if task.depth == 0 {
         return String::new();
     }
 
     let mut prefix = String::new();
-    let line_color = ansi::DIM;
-    let reset = ansi::RESET;
+    let line_color = cs.dim;
+    let reset = cs.reset;
 
     // Show continuation columns for each ancestor level (from root-most to parent).
     // ancestor_continuations is ordered [parent, grandparent, ...], so we take
@@ -75,20 +75,21 @@ pub fn tree_prefix(task: &TaskLine) -> String {
     prefix
 }
 
-pub fn highlight_line(line: &str, padding: &str) -> String {
-    let bg = ansi::BG_SELECTED;
-    let highlighted = line.replace(ansi::RESET, &format!("{}{bg}", ansi::RESET));
-    format!("{bg}{}{}{}", highlighted, padding, ansi::RESET)
+pub fn highlight_line(line: &str, padding: &str, cs: &ColorScheme) -> String {
+    let bg = cs.bg_selected;
+    let reset = cs.reset;
+    let highlighted = line.replace(reset, &format!("{reset}{bg}"));
+    format!("{bg}{}{}{}", highlighted, padding, reset)
 }
 
-pub fn render_task(task: &TaskLine) -> String {
-    let prefix = tree_prefix(task);
+pub fn render_task(task: &TaskLine, cs: &ColorScheme) -> String {
+    let prefix = tree_prefix(task, cs);
     let status = status_symbol(task);
 
-    let color = task_color(task);
+    let color = task_color(task, cs);
 
     let name = if matches!(task.state, TaskState::Done) {
-        format!("{}{}{}", ansi::STRIKETHROUGH, task.name, ansi::RESET)
+        format!("{}{}{}", cs.strikethrough, task.name, cs.reset)
     } else {
         task.name.clone()
     };
@@ -106,13 +107,13 @@ pub fn render_task(task: &TaskLine) -> String {
     };
 
     let assignment = if let Some(agent) = &task.assigned_to {
-        format!(" [{}{}{}]", ansi::CYAN, agent, ansi::RESET)
+        format!(" [{}{}{}]", cs.cyan, agent, cs.reset)
     } else {
         String::new()
     };
 
     let status_color = if matches!(task.state, TaskState::Done) {
-        ansi::DIM
+        cs.dim
     } else {
         color
     };
@@ -125,13 +126,14 @@ pub fn render_task(task: &TaskLine) -> String {
         name,
         review_suffix,
         assignment,
-        ansi::RESET
+        cs.reset
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{DARK, LIGHT};
     use crate::InMemoryTaskSource;
 
     fn build_tasks_from(source: &dyn crate::TaskSource) -> Vec<TaskLine> {
@@ -144,7 +146,7 @@ mod tests {
             agent_status: Some("blocked: waiting".to_string()),
             ..TaskLine::default()
         };
-        assert_eq!(task_color(&task), ansi::RED);
+        assert_eq!(task_color(&task, &DARK), ansi::RED);
     }
 
     #[test]
@@ -153,7 +155,7 @@ mod tests {
             agent_status: Some("done: finished".to_string()),
             ..TaskLine::default()
         };
-        assert_eq!(task_color(&task), ansi::GREEN);
+        assert_eq!(task_color(&task, &DARK), ansi::GREEN);
     }
 
     #[test]
@@ -162,7 +164,7 @@ mod tests {
             agent_status: Some("wip: working".to_string()),
             ..TaskLine::default()
         };
-        assert_eq!(task_color(&task), ansi::YELLOW);
+        assert_eq!(task_color(&task, &DARK), ansi::YELLOW);
     }
 
     #[test]
@@ -172,7 +174,7 @@ mod tests {
             agent_status: None,
             ..TaskLine::default()
         };
-        assert_eq!(task_color(&task), ansi::YELLOW);
+        assert_eq!(task_color(&task, &DARK), ansi::YELLOW);
     }
 
     #[test]
@@ -182,7 +184,17 @@ mod tests {
             agent_status: None,
             ..TaskLine::default()
         };
-        assert_eq!(task_color(&task), ansi::WHITE);
+        assert_eq!(task_color(&task, &DARK), ansi::WHITE);
+    }
+
+    #[test]
+    fn task_color_default_fg_for_todo_in_light_mode() {
+        let task = TaskLine {
+            state: TaskState::Todo,
+            agent_status: None,
+            ..TaskLine::default()
+        };
+        assert_eq!(task_color(&task, &LIGHT), "\x1b[39m");
     }
 
     #[test]
@@ -195,7 +207,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let grandchild = tasks.iter().find(|t| t.name == "grandchild").unwrap();
-        let prefix = tree_prefix(grandchild);
+        let prefix = tree_prefix(grandchild, &DARK);
         assert_eq!(
             prefix,
             format!(
@@ -217,7 +229,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let child2 = tasks.iter().find(|t| t.name == "child2").unwrap();
-        let prefix = tree_prefix(child2);
+        let prefix = tree_prefix(child2, &DARK);
         assert_eq!(prefix, format!("{}╰─{}", ansi::DIM, ansi::RESET));
     }
 
@@ -230,7 +242,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let grandchild = tasks.iter().find(|t| t.name == "grandchild").unwrap();
-        let prefix = tree_prefix(grandchild);
+        let prefix = tree_prefix(grandchild, &DARK);
         assert_eq!(prefix, format!("  {}╰─{}", ansi::DIM, ansi::RESET));
     }
 
@@ -245,7 +257,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let d = tasks.iter().find(|t| t.name == "d").unwrap();
-        let prefix = tree_prefix(d);
+        let prefix = tree_prefix(d, &DARK);
         assert_eq!(
             prefix,
             format!(
@@ -266,7 +278,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let task = tasks.iter().find(|t| t.name == "my-task").unwrap();
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
 
         assert!(rendered.contains("●"), "rendered: {:?}", rendered);
     }
@@ -279,7 +291,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let task = tasks.iter().find(|t| t.name == "my-task").unwrap();
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
 
         assert!(rendered.contains(ansi::STRIKETHROUGH));
         assert!(rendered.contains("my-task"));
@@ -294,7 +306,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let task = tasks.iter().find(|t| t.name == "my-task").unwrap();
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
 
         assert!(rendered.contains("○"));
         assert!(rendered.contains(ansi::WHITE));
@@ -314,7 +326,7 @@ mod tests {
             task.assigned_to
         );
 
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
         assert!(rendered.contains("bob"), "rendered: {:?}", rendered);
     }
 
@@ -340,7 +352,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let task = tasks.iter().find(|t| t.name == "my-task").unwrap();
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
         assert!(
             rendered.contains("✅"),
             "pass should render ✅: {:?}",
@@ -356,7 +368,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let task = tasks.iter().find(|t| t.name == "my-task").unwrap();
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
         assert!(
             rendered.contains("❌"),
             "fail should render ❌: {:?}",
@@ -372,7 +384,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let task = tasks.iter().find(|t| t.name == "my-task").unwrap();
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
         assert!(
             rendered.contains("🔍"),
             "in-progress should render 🔍: {:?}",
@@ -388,7 +400,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let task = tasks.iter().find(|t| t.name == "my-task").unwrap();
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
         assert!(
             rendered.contains("✅"),
             "pass: looks good should render ✅: {:?}",
@@ -404,7 +416,7 @@ mod tests {
 
         let tasks = build_tasks_from(&src);
         let task = tasks.iter().find(|t| t.name == "my-task").unwrap();
-        let rendered = render_task(task);
+        let rendered = render_task(task, &DARK);
         assert!(
             rendered.contains("❌"),
             "fail: missing tests should render ❌: {:?}",
@@ -414,7 +426,7 @@ mod tests {
 
     #[test]
     fn highlight_line_uses_explicit_bg_not_reverse_video() {
-        let result = highlight_line("hello", "   ");
+        let result = highlight_line("hello", "   ", &DARK);
         assert!(
             result.starts_with(ansi::BG_SELECTED),
             "should start with explicit bg: {:?}",
@@ -435,7 +447,7 @@ mod tests {
     #[test]
     fn highlight_line_reestablishes_bg_after_reset() {
         let line = &format!("{}foo{}bar", ansi::GREEN, ansi::RESET);
-        let result = highlight_line(line, "");
+        let result = highlight_line(line, "", &DARK);
         assert!(
             result.contains(&format!("{}{}", ansi::RESET, ansi::BG_SELECTED)),
             "bg not re-established after reset: {:?}",
@@ -445,12 +457,22 @@ mod tests {
 
     #[test]
     fn highlight_line_padding_uses_same_bg() {
-        let result = highlight_line("hi", "     ");
+        let result = highlight_line("hi", "     ", &DARK);
         assert!(result.starts_with(ansi::BG_SELECTED));
         let reset_pos = result.rfind(ansi::RESET).unwrap();
         assert!(
             reset_pos == result.len() - ansi::RESET.len(),
             "final reset should be at end: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn highlight_line_light_mode_uses_light_bg() {
+        let result = highlight_line("hello", "   ", &LIGHT);
+        assert!(
+            result.starts_with("\x1b[48;5;252m"),
+            "light mode should start with light gray bg: {:?}",
             result
         );
     }

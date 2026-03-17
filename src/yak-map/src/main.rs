@@ -9,7 +9,7 @@ mod tree;
 mod util;
 
 use model::ansi;
-use model::TaskLine;
+use model::{TaskLine, DARK, LIGHT};
 use repository::{InMemoryTaskSource, TaskRepository, TaskSource};
 
 pub(crate) struct State {
@@ -22,6 +22,7 @@ pub(crate) struct State {
     toast_message: Option<String>,
     toast_ticks_remaining: u8,
     pending_clipboard: Option<String>,
+    pub(crate) is_light_mode: bool,
 }
 
 impl Default for State {
@@ -37,6 +38,7 @@ impl Default for State {
             toast_message: None,
             toast_ticks_remaining: 0,
             pending_clipboard: None,
+            is_light_mode: false,
         }
     }
 }
@@ -159,9 +161,27 @@ impl State {
     }
 }
 
+fn palette_color_luminance(color: PaletteColor) -> f32 {
+    let s = color.as_rgb_str(); // "rgb(r, g, b)"
+    let nums: Vec<u8> = s
+        .trim_start_matches("rgb(")
+        .trim_end_matches(')')
+        .split(',')
+        .filter_map(|n| n.trim().parse().ok())
+        .collect();
+    if nums.len() == 3 {
+        (0.2126 * nums[0] as f32 + 0.7152 * nums[1] as f32 + 0.0722 * nums[2] as f32) / 255.0
+    } else {
+        0.0
+    }
+}
+
 impl ZellijPlugin for State {
-    fn load(&mut self, _configuration: BTreeMap<String, String>) {
-        subscribe(&[EventType::Timer, EventType::Key]);
+    fn load(&mut self, configuration: BTreeMap<String, String>) {
+        if configuration.get("light_mode").map(|v| v == "true").unwrap_or(false) {
+            self.is_light_mode = true;
+        }
+        subscribe(&[EventType::Timer, EventType::Key, EventType::ModeUpdate]);
         set_timeout(2.0);
         request_permission(&[PermissionType::OpenFiles, PermissionType::RunCommands]);
 
@@ -188,15 +208,27 @@ impl ZellijPlugin for State {
                 true
             }
             Event::Key(key) => self.handle_key(key),
+            Event::ModeUpdate(mode_info) => {
+                let bg = mode_info.style.colors.text_unselected.background;
+                let luminance = palette_color_luminance(bg);
+                let new_light = luminance > 0.5;
+                if new_light != self.is_light_mode {
+                    self.is_light_mode = new_light;
+                    true
+                } else {
+                    false
+                }
+            }
             _ => false,
         }
     }
 
     fn render(&mut self, rows: usize, cols: usize) {
         let _ = self.pending_clipboard.take();
+        let cs = if self.is_light_mode { &LIGHT } else { &DARK };
 
         if let Some(error) = &self.error {
-            println!("{}Error: {}{}", ansi::RED, error, ansi::RESET);
+            println!("{}Error: {}{}", cs.red, error, cs.reset);
             return;
         }
 
@@ -222,12 +254,12 @@ impl ZellijPlugin for State {
             .take(max_rows)
             .enumerate()
         {
-            let line = render::render_task(task);
+            let line = render::render_task(task, cs);
 
             if self.scroll_offset + i == self.selected_index {
                 let visible_len = util::line_display_width(&line);
                 let padding = " ".repeat(cols.saturating_sub(visible_len));
-                println!("{}", render::highlight_line(&line, &padding));
+                println!("{}", render::highlight_line(&line, &padding, cs));
             } else {
                 println!("{}", line);
             }

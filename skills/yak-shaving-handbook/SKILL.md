@@ -172,6 +172,53 @@ echo "blocked: nix flake check fails with 'attribute yx missing' — yx buildRus
 
 Then stop. Don't retry the same failing approach. Yakob will intervene or reassign.
 
+## HALT Conditions
+
+Set `blocked:<reason>` immediately when any of these apply:
+
+- 3 consecutive failures on the same approach — stop, don't retry
+- Ambiguity that requires a human decision to resolve
+- Scope exceeds the task definition
+- A blocking dependency is discovered
+- Required config or access is missing
+
+**Do NOT halt for:**
+- Warnings that don't block functionality
+- Style nits (follow existing patterns and continue)
+- Minor issues you can note in `comments.md` and continue past
+
+## Escalation Detection
+
+Count escalation signals in your task before continuing:
+
+| Signal | Effect |
+|--------|--------|
+| Multiple components mentioned | +1 |
+| System-level language (platform, integration, architecture) | +1 |
+| Uncertainty about approach | +1 |
+| Multi-layer scope (UI + backend + data) | +1 |
+| Simplicity marker ("just", "fix", "bug", "typo") | −1 |
+| Single file or component focus | −1 |
+| Confident, specific request | −1 |
+
+**If net score ≥ 2:** set `blocked: scope-exceeds-task` and stop.
+
+**Loopback rule:** If you've applied the same fix 3+ times without success, stop. Set blocked and report what you tried.
+
+## DoD Self-Check
+
+Run this checklist before `yx done`:
+
+- [ ] All tasks from the context brief addressed
+- [ ] No tasks skipped without a documented reason in `comments.md`
+- [ ] Existing tests still pass
+- [ ] New tests written for new functionality
+- [ ] Acceptance criteria demonstrably met
+- [ ] Follows existing code patterns
+- [ ] Error handling consistent with codebase
+
+If any item fails, fix it or document why it doesn't apply before marking done.
+
 ## Completing Work
 
 ```bash

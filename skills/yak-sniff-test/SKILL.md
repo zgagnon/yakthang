@@ -59,28 +59,44 @@ actual state of the codebase matches what was asked for.
 
 <paste agent-status here>
 
-## Shaver's Notes (comments.md)
+## Git Evidence
 
-<paste comments.md here — this tells you where to look>
+Run to find what changed (do not ask the shaver — derive evidence only from the brief and the diff):
+
+```bash
+git log --oneline -10    # find recent commits
+git diff HEAD~1          # or the relevant commit hash
+```
 
 ## Your Task
 
 1. Extract the key deliverables from the original brief. What was explicitly
    promised? What are the acceptance criteria?
 
-2. Read comments.md carefully. The shaver should have noted which files,
-   repos, or directories were changed. Navigate to those locations.
+2. Check git log and diff to find what was changed. Navigate to those locations.
+   Do not use the shaver's reasoning — all evidence must come from the brief
+   and the git diff.
 
 3. For each deliverable, independently verify it exists in the actual state of
    the codebase. Check git log, file contents, test output — whatever applies.
    Do not trust the summary. Look at the evidence.
 
-4. Produce a binary verdict:
-   - `pass: <one-line summary of what you confirmed>`
-   - `fail: <one-line summary of the gap>`
-   - `needs-info: <what's missing that prevents verification>`
+4. Classify every finding using this taxonomy:
+   - **patch** — trivially fixable code issue
+   - **intent_gap** — spec is incomplete, cannot resolve from existing info
+   - **bad_spec** — spec/brief is wrong or ambiguous
+   - **defer** — pre-existing issue, not caused by this change
+   - **reject** — noise, drop silently
 
-5. Write your verdict:
+   **Minimum findings mandate:** Surface at least 3 findings. If you find
+   fewer, re-analyze. Zero findings is a HALT — do not produce a verdict.
+
+5. Produce a verdict based on your classified findings:
+   - `pass: <one-line summary>` — only valid when all findings are `defer` or `reject`
+   - `fail: <one-line summary>` — any `patch` or `intent_gap` finding present
+   - `needs-info: <what's missing>` — cannot verify without more information
+
+6. Write your verdict:
 
 ```bash
 echo "pass: <summary>" | yx field <done-yak-id> review-verdict
@@ -122,15 +138,16 @@ Agent tool call:
     ## Shaver's Done Summary
     <paste agent-status>
 
-    ## Shaver's Notes
-    <paste comments.md or "No comments were left.">
-
     ## Your Task
-    1. Check git log in <relevant-dir> for recent commits
+    1. Check git log and diff in <relevant-dir> — derive evidence from the diff,
+       not the shaver's reasoning
     2. Verify each acceptance criterion against actual code
-    3. Note which test commands should be run (e.g., go test ./..., cargo test)
+    3. Classify every finding: patch / intent_gap / bad_spec / defer / reject
+       Surface at least 3 findings; zero findings = HALT, re-analyze
+    4. Note which test commands should be run (e.g., go test ./..., cargo test)
        but do NOT run them yourself — Yakob will run tests separately
-    4. Report verdict: pass, fail, or needs-info with file/line evidence
+    5. Report verdict: pass (all findings defer/reject), fail (any patch/intent_gap),
+       or needs-info — with file/line evidence
 ```
 
 ### 4. When the subagent returns

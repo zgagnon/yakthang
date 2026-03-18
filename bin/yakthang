@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# yakthang launcher
+# Finds orchestrator.kdl in $CONFIG_DIR and starts a Zellij session.
+# Works from any working directory.
+
+SESSION_NAME="${1:-}"
+
+# Locate the orchestrator config
+CONFIG_DIR="${YAKTHANG_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/yakthang}"
+ORCHESTRATOR="$CONFIG_DIR/orchestrator.kdl"
+
+if [[ ! -f "$ORCHESTRATOR" ]]; then
+    echo "Error: orchestrator.kdl not found at $ORCHESTRATOR"
+    echo ""
+    echo "Run 'just install' from the yakthang repo, or set YAKTHANG_CONFIG to override."
+    exit 1
+fi
+
+# Clean up exited sessions and attach or create
+SESSIONS=$(zellij list-sessions 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' || true)
+
+if [[ -n "$SESSION_NAME" ]]; then
+    # Clean up dead session with this name if present
+    if echo "$SESSIONS" | grep -q "^${SESSION_NAME}.*EXITED"; then
+        echo "Cleaning up dead session '${SESSION_NAME}'..."
+        zellij delete-session "${SESSION_NAME}"
+        SESSIONS=$(zellij list-sessions 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' || true)
+    fi
+
+    if echo "$SESSIONS" | grep -q "^${SESSION_NAME} "; then
+        echo "Attaching to existing session '${SESSION_NAME}'..."
+        zellij attach "${SESSION_NAME}"
+    else
+        echo "Starting new session '${SESSION_NAME}'..."
+        zellij -s "${SESSION_NAME}" --layout "$ORCHESTRATOR"
+    fi
+else
+    echo "Starting new yakthang session..."
+    zellij --layout "$ORCHESTRATOR"
+fi

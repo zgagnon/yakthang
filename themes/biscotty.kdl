@@ -1,15 +1,10 @@
-// Orchestrator layout for agent-deck with Zellij + Yaks
+// Biscotty theme for Zellij — light variant matching Ghostty biscotty
+// Warm peachy-cream background (#f5ede5) with restrained strategic highlighting.
 //
-// Tab 1 (Orchestrator):
-//   Left 1/3:  live `yx ls` watcher showing task state
-//   Right 2/3: orchestrator Claude Code instance that plans and spawns workers
-//
-// Workers are spawned as new tabs by the orchestrator via spawn-worker.sh
+// The key value is text_unselected.background = 245 237 229 (#f5ede5).
+// yak-map reads this via ModeUpdate to detect light mode and switch to the
+// LIGHT ColorScheme (WCAG AA contrast against #f5ede5).
 
-// Biscotty theme — light variant matching Ghostty biscotty (#f5ede5 background).
-// The key value is text_unselected.background = 245 237 229 (#f5ede5):
-// yak-map reads this via ModeUpdate to detect light mode and activate the
-// LIGHT ColorScheme. Switch back to themes/gruvbox.kdl for dark mode.
 themes {
     biscotty {
         text_unselected {
@@ -137,44 +132,4 @@ themes {
             player_10 0
         }
     }
-}
-
-theme "biscotty"
-
-layout {
-    default_tab_template {
-        pane size=1 borderless=true {
-            plugin location="compact-bar"
-        }
-        children
-        pane size=2 borderless=true {
-            plugin location="status-bar"
-        }
-    }
-
-    // --- Orchestrator tab ---------------------------------------------------
-    tab name="Yakob's 🛖" focus=true {
-        pane split_direction="vertical" {
-            // Left 1/3: live yak status with assignments (Zellij plugin)
-            pane size="45%" name="yak-map" {
-                plugin location="file:~/.local/share/zellij/plugins/yak-map.wasm"
-            }
-
-            // Right 2/3: Claude (Yakob) + shell
-            pane split_direction="horizontal" size="67%" {
-                pane name="yakob" focus=true {
-                    command "claude"
-                    args "--agent" "yakob" "--dangerously-skip-permissions"
-                }
-                pane size="20%" name="shell (orchestrator)"
-            }
-        }
-    }
-
-    // --- Worker tabs are created dynamically by spawn-worker.sh -------------
-    // The orchestrator calls:
-    //   spawn-worker.sh --cwd ./api --name "auth-worker" \
-    //     "You have access to yx. Run 'yx ls' to see tasks. ..."
-    //
-    // Each worker gets its own tab via yak-box spawn.
 }

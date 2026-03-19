@@ -6,8 +6,8 @@ BIN_DIR    := env_var_or_default("YAKTHANG_BIN",    env_var_or_default("YAKTHANG
 CONFIG_DIR := env_var_or_default("YAKTHANG_CONFIG", env_var_or_default("XDG_CONFIG_HOME", env_var("HOME") + "/.config") + "/yakthang")
 CLAUDE_DIR := env_var_or_default("YAKTHANG_CLAUDE", env_var("HOME") + "/.claude")
 
-# Zellij plugin dir — discovered at load time (no env var override; use zellij --data-dir if needed)
-ZELLIJ_PLUGIN_DIR := `zellij setup --check 2>/dev/null | grep 'PLUGIN DIR' | awk '{print $NF}'`
+# Zellij plugin dir — discovered at load time; falls back to XDG default if zellij absent
+ZELLIJ_PLUGIN_DIR := `zellij setup --check 2>/dev/null | grep -i 'plugin dir' | sed 's/.*"\(.*\)".*/\1/' || echo "${XDG_DATA_HOME:-$HOME/.local/share}/zellij/plugins"`
 
 default: build
 
@@ -65,9 +65,11 @@ install-agent:
 install-skills:
     #!/usr/bin/env bash
     set -euo pipefail
+    [[ -d "skills" ]] || { echo "Error: run from yakthang repo root"; exit 1; }
     mkdir -p "{{CLAUDE_DIR}}/skills"
     for skill_dir in skills/yak-*/; do
         skill=$(basename "$skill_dir")
+        rm -rf "{{CLAUDE_DIR}}/skills/$skill"
         cp -r "$skill_dir" "{{CLAUDE_DIR}}/skills/$skill"
         echo "✓ $skill → {{CLAUDE_DIR}}/skills/$skill"
     done
@@ -89,8 +91,19 @@ install-launcher:
 # Doctor group
 # ---------------------------------------------------------------------------
 
-# Check all installed components
-doctor: check-yx check-yak-box check-yakthang check-agent check-skills check-yak-map check-config
+# Check all installed components — runs every check, reports all failures, exits non-zero if any fail
+doctor:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    failed=0
+    just check-yx      || failed=1
+    just check-yak-box || failed=1
+    just check-yakthang || failed=1
+    just check-agent   || failed=1
+    just check-skills  || failed=1
+    just check-yak-map || failed=1
+    just check-config  || failed=1
+    exit $failed
 
 # Check yx binary
 check-yx:
@@ -156,6 +169,7 @@ check-agent:
 check-skills:
     #!/usr/bin/env bash
     set -euo pipefail
+    [[ -d "skills" ]] || { echo "Error: run from yakthang repo root"; exit 1; }
     failed=0
     for skill_dir in skills/yak-*/; do
         skill=$(basename "$skill_dir")

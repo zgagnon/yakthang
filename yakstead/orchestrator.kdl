@@ -6,31 +6,159 @@
 //
 // Workers are spawned as new tabs by the orchestrator via spawn-worker.sh
 
-// Biscotty theme — light variant matching Ghostty biscotty (#f5ede5 background).
-// The key value is text_unselected.background = 245 237 229 (#f5ede5):
-// yak-map reads this via ModeUpdate to detect light mode and activate the
-// LIGHT ColorScheme. Switch back to themes/gruvbox.kdl for dark mode.
+// Custom Gruvbox theme with enhanced frame styling
+// Key changes from gruvbox-dark:
+// - Added frame_unselected component (missing in built-in theme)
+// - Updated frame colors to use orchestrator accent color (#d79921 / 215 153 33)
 themes {
+    gruvbox {
+        text_unselected {
+            base 251 241 199
+            background 60 56 54
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 152 151 26
+            emphasis_3 177 98 134
+        }
+        text_selected {
+            base 251 241 199
+            background 80 73 69
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 152 151 26
+            emphasis_3 177 98 134
+        }
+        ribbon_selected {
+            base 60 56 54
+            background 152 151 26
+            emphasis_0 204 36 29
+            emphasis_1 214 93 14
+            emphasis_2 177 98 134
+            emphasis_3 69 133 136
+        }
+        ribbon_unselected {
+            base 60 56 54
+            background 235 219 178
+            emphasis_0 204 36 29
+            emphasis_1 251 241 199
+            emphasis_2 69 133 136
+            emphasis_3 177 98 134
+        }
+        table_title {
+            base 152 151 26
+            background 0
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 152 151 26
+            emphasis_3 177 98 134
+        }
+        table_cell_selected {
+            base 251 241 199
+            background 80 73 69
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 152 151 26
+            emphasis_3 177 98 134
+        }
+        table_cell_unselected {
+            base 251 241 199
+            background 60 56 54
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 152 151 26
+            emphasis_3 177 98 134
+        }
+        list_selected {
+            base 251 241 199
+            background 80 73 69
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 152 151 26
+            emphasis_3 177 98 134
+        }
+        list_unselected {
+            base 251 241 199
+            background 60 56 54
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 152 151 26
+            emphasis_3 177 98 134
+        }
+        frame_unselected {
+            base 102 92 84
+            background 0
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 177 98 134
+            emphasis_3 0
+        }
+        frame_selected {
+            base 215 153 33
+            background 0
+            emphasis_0 214 93 14
+            emphasis_1 104 157 106
+            emphasis_2 177 98 134
+            emphasis_3 0
+        }
+        frame_highlight {
+            base 214 93 14
+            background 0
+            emphasis_0 177 98 134
+            emphasis_1 214 93 14
+            emphasis_2 214 93 14
+            emphasis_3 214 93 14
+        }
+        exit_code_success {
+            base 152 151 26
+            background 0
+            emphasis_0 104 157 106
+            emphasis_1 60 56 54
+            emphasis_2 177 98 134
+            emphasis_3 69 133 136
+        }
+        exit_code_error {
+            base 204 36 29
+            background 0
+            emphasis_0 215 153 33
+            emphasis_1 0
+            emphasis_2 0
+            emphasis_3 0
+        }
+        multiplayer_user_colors {
+            player_1 177 98 134
+            player_2 69 133 136
+            player_3 0
+            player_4 215 153 33
+            player_5 104 157 106
+            player_6 0
+            player_7 204 36 29
+            player_8 0
+            player_9 0
+            player_10 0
+        }
+    }
+    // Biscotty — light variant matching Ghostty biscotty (#f5ede5 background).
+    // text_unselected.background = 245 237 229 triggers yak-map LIGHT palette.
     biscotty {
         text_unselected {
-            base 58 58 58           // #3a3a3a foreground
-            background 245 237 229  // #f5ede5 background — used for light mode detection
-            emphasis_0 209 72 48    // #d14830 red
-            emphasis_1 0 135 95     // #00875f green
-            emphasis_2 215 135 95   // #d7875f warm orange
-            emphasis_3 122 74 148   // #7a4a94 magenta
+            base 58 58 58
+            background 245 237 229
+            emphasis_0 209 72 48
+            emphasis_1 0 135 95
+            emphasis_2 215 135 95
+            emphasis_3 122 74 148
         }
         text_selected {
             base 58 58 58
-            background 229 217 204  // #e5d9cc selection background
+            background 229 217 204
             emphasis_0 209 72 48
             emphasis_1 0 135 95
             emphasis_2 215 135 95
             emphasis_3 122 74 148
         }
         ribbon_selected {
-            base 245 237 229        // light text on colored tab
-            background 82 118 161   // #5276a1 cursor blue
+            base 245 237 229
+            background 82 118 161
             emphasis_0 209 72 48
             emphasis_1 215 135 95
             emphasis_2 122 74 148
@@ -38,14 +166,14 @@ themes {
         }
         ribbon_unselected {
             base 58 58 58
-            background 215 135 95   // #d7875f warm orange
+            background 215 135 95
             emphasis_0 209 72 48
             emphasis_1 245 237 229
             emphasis_2 0 135 95
             emphasis_3 122 74 148
         }
         table_title {
-            base 82 118 161         // #5276a1 blue accent
+            base 82 118 161
             background 0
             emphasis_0 209 72 48
             emphasis_1 0 135 95
@@ -85,7 +213,7 @@ themes {
             emphasis_3 122 74 148
         }
         frame_unselected {
-            base 138 138 138        // #8a8a8a dim gray
+            base 138 138 138
             background 0
             emphasis_0 209 72 48
             emphasis_1 0 135 95
@@ -93,7 +221,7 @@ themes {
             emphasis_3 0
         }
         frame_selected {
-            base 82 118 161         // #5276a1 cursor blue for focused pane
+            base 82 118 161
             background 0
             emphasis_0 209 72 48
             emphasis_1 0 135 95
@@ -101,7 +229,7 @@ themes {
             emphasis_3 0
         }
         frame_highlight {
-            base 209 72 48          // #d14830 red for mode highlights
+            base 209 72 48
             background 0
             emphasis_0 122 74 148
             emphasis_1 209 72 48
@@ -109,7 +237,7 @@ themes {
             emphasis_3 209 72 48
         }
         exit_code_success {
-            base 0 135 95           // #00875f green
+            base 0 135 95
             background 0
             emphasis_0 0 135 95
             emphasis_1 58 58 58
@@ -117,7 +245,7 @@ themes {
             emphasis_3 0 135 95
         }
         exit_code_error {
-            base 209 72 48          // #d14830 red
+            base 209 72 48
             background 0
             emphasis_0 215 135 95
             emphasis_1 0
@@ -125,13 +253,13 @@ themes {
             emphasis_3 0
         }
         multiplayer_user_colors {
-            player_1 122 74 148     // magenta
-            player_2 0 135 95       // green
+            player_1 122 74 148
+            player_2 0 135 95
             player_3 0
-            player_4 215 135 95     // orange
-            player_5 0 135 95       // green
+            player_4 215 135 95
+            player_5 0 135 95
             player_6 0
-            player_7 209 72 48      // red
+            player_7 209 72 48
             player_8 0
             player_9 0
             player_10 0
@@ -157,7 +285,9 @@ layout {
         pane split_direction="vertical" {
             // Left 1/3: live yak status with assignments (Zellij plugin)
             pane size="45%" name="yak-map" {
-                plugin location="file:~/.local/share/zellij/plugins/yak-map.wasm"
+                plugin location="file:~/.local/share/zellij/plugins/yak-map.wasm" {
+                    light_mode "true"
+                }
             }
 
             // Right 2/3: Claude (Yakob) + shell

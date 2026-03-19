@@ -275,6 +275,8 @@ trap _restore_keychain EXIT
 # Write PID before running Claude so yak-box stop can find and kill the process tree.
 echo $$ > "%s"
 claude "${CLAUDE_ARGS[@]}" @"$PROMPT_FILE"
+# Self-cleanup: close this Zellij tab when the worker finishes
+zellij action close-tab
 `, filepath.Join(hostHomeDir, ".local", "bin"), homeDir, gitConfigGlobalLine, ghConfigDirLine, gitIdentityLines, shaverNameLine, worker.YakPath, filepath.Dir(worker.YakPath), apiKeyLine, worker.Model, promptFile, pidFile)
 	case "cursor":
 		paneName = "cursor (build) [native]"
@@ -286,10 +288,12 @@ MODEL=%q
 # Write PID before exec so yak-box stop can find and kill the process tree.
 echo $$ > "%s"
 if [[ -n "$MODEL" ]]; then
-  exec agent --force --model "$MODEL" --workspace "%s" "$PROMPT"
+  agent --force --model "$MODEL" --workspace "%s" "$PROMPT"
 else
-  exec agent --force --workspace "%s" "$PROMPT"
+  agent --force --workspace "%s" "$PROMPT"
 fi
+# Self-cleanup: close this Zellij tab when the worker finishes
+zellij action close-tab
 `, shaverNameLine, worker.YakPath, filepath.Dir(worker.YakPath), promptFile, worker.Model, pidFile, worker.CWD, worker.CWD)
 	default:
 		paneName = "opencode (build) [native]"
@@ -297,10 +301,11 @@ fi
 %sexport YAK_PATH="%s"
 export YX_ROOT="%s"
 PROMPT="$(cat "%s")"
-# Write PID before exec so yak-box stop can find and kill the process tree.
-# exec replaces this process, so $$ will be the PID of opencode.
+# Write PID so yak-box stop can find and kill the process tree.
 echo $$ > "%s"
-exec opencode --prompt "$PROMPT" --agent build
+opencode --prompt "$PROMPT" --agent build
+# Self-cleanup: close this Zellij tab when the worker finishes
+zellij action close-tab
 `, shaverNameLine, worker.YakPath, filepath.Dir(worker.YakPath), promptFile, pidFile)
 	}
 	return content, paneName

@@ -242,7 +242,7 @@ start each yak, run: echo '$supervisor' | yx field <id> supervised-by"`
 skill_flags=$(ls -d .claude/skills/*/ 2>/dev/null | sed 's|/$||' | xargs -I{} echo "--skill {}" | tr '\n' ' ')
 
 yak-box spawn \
-  --cwd ./api \
+  --cwd . \
   --yak-name "api-auth" \
   --shaver-name "Yakriel" \
   --tool claude \
@@ -252,8 +252,9 @@ yak-box spawn \
   "Your supervisor is $supervisor. When you start each yak, run:
    echo '$supervisor' | yx field <id> supervised-by
 
-   Work on the auth tasks. For each task, read its context with
-   'yx context --show <name>', do the work, then 'yx done <name>'."
+   Your working files are in repos/api/. Work on the auth tasks.
+   For each task, read its context with 'yx context --show <name>',
+   do the work, then 'yx done <name>'."
 ```
 
 The spawn command injects yx usage instructions and skill references into the
@@ -268,6 +269,21 @@ worker's prompt. The worker will:
 Each worker should be scoped to:
 - **One directory** (via `--cwd`)
 - **A subset of tasks** (described in the prompt and via `--yaks`)
+
+### ⚠️ NEVER cross repo boundaries
+
+**All shavers in release-workspace MUST use `--cwd .` (the release-workspace
+root).** Do NOT set `--cwd` to a subdirectory under `repos/` — this causes
+yx to look for `.yaks/` in the wrong place, clobbering task state.
+
+If a shaver needs to edit files in `repos/yakthang` or another sub-repo:
+- Set `--cwd` to the release-workspace root
+- Tell the shaver in the prompt: "Your working files are in `repos/yakthang/...`"
+- The shaver navigates there for code work but yx stays rooted correctly
+
+**Never use `--yak-path` to point across repo boundaries.** This was the root
+cause of repeated `.yaks/` corruption and git notes collisions. If you catch
+yourself reaching for `--yak-path`, stop and reconsider the `--cwd`.
 
 ### Stopping workers
 
@@ -341,3 +357,17 @@ When all tasks show `done` in `yx ls`, the work is complete.
     the full day.
 11. **Start the heartbeat.** After triage, before the first spawn, run
     `/loop 5m yx ls`. No heartbeat = no visibility between turns.
+12. **Never cross repo boundaries.** Always `--cwd .` from release-workspace.
+    Never `--cwd repos/X` or `--yak-path` pointing elsewhere. Shavers navigate
+    to sub-repos in their prompt, but yx stays rooted in the workspace.
+
+### Pre-Spawn Checklist
+
+Before EVERY `yak-box spawn`, verify ALL of the following:
+1. Session yak exists: `yx ls` shows a `session-` yak in wip state
+2. Heartbeat is running: `/loop` was started after triage
+3. WIP count < limit: count wip yaks (excluding session yak) against wip-limit field
+4. `--cwd` is `.` or the workspace root: NEVER `repos/X` — see rule 12
+
+If ANY check fails, STOP. Do not spawn. Fix the missing piece first.
+If no session yak exists, run `/yak-triage` before proceeding.
